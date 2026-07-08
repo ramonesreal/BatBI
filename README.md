@@ -96,10 +96,32 @@ npm run dev
 ```
 ### 3. Spin Up the Analytical Engine (Python)
 
-Navigate to the data-engine directory, install the dependencies, and start the Flask service:
+Navigate to the data-engine directory, initialize and activate the virtual environment, install the dependencies, and start the Flask service:
 ```bash
 cd ../data-engine
+```
+
+Create the virtual environment (if not already created):
+```bash
+python -m venv venv
+```
+
+Activate the virtual environment:
+
+* On Windows:
+```bash
+venv\Scripts\activate
+```
+* On macOS/Linux:
+```
+source venv/bin/activate
+```
+Install dependencies inside the virtual environment:
+```
 pip install pandas flask flask-cors form-data
+```
+Start the engine:
+```
 python app.py
 ```
 ### 4. Run the Interface (React Frontend)
