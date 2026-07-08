@@ -1,0 +1,8 @@
+@import "tailwindcss";
+
+body {
+  background-color: #030712; /* Slate 950 */
+  color: #f9fafb;
+  margin: 0;
+  font-family: Inter, system-ui, sans-serif;
+}

@@ -1,0 +1,28 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// 1. Tabela de Usuários
+model User {
+  id         String      @id @default(uuid()) // Gera um ID único universal (UUID) textualmente
+  nome       String
+  email      String      @unique // Garante que não existam dois usuários com o mesmo e-mail
+  senha      String      // Aqui guardaremos a senha criptografada (hash) mais para a frente
+  createdAt  DateTime    @default(now())
+  dashboards Dashboard[] // Relação: Um usuário pode ter vários dashboards
+}
+
+// 2. Tabela de Dashboards salvos
+model Dashboard {
+  id          String   @id @default(uuid())
+  titulo      String   // Nome que o usuário vai dar para o gráfico dele
+  configJson  String   // O JSON completo de resposta do gráfico que veio do Python
+  userId      String   // Chave estrangeira ligando o gráfico ao usuário
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+}
