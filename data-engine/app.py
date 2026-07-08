@@ -4,84 +4,87 @@ import pandas as pd
 
 app = Flask(__name__)
 
+# [SECURITY] Limit maximum upload size to 100MB to prevent memory exhaustion (DoS)
+app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024
 
-@app.route("/inspecionar-csv", methods=["POST"])
-def inspecionar_csv():
-    """🔍 ROTA DE INSPEÇÃO: Inspeciona o arquivo e retorna os nomes de todas as colunas existentes."""
+
+@app.route("/inspect-csv", methods=["POST"])
+def inspect_csv():
+    """🔍 INSPECTION ROUTE: Inspects the uploaded file and returns the names of all columns."""
     if "file" not in request.files:
-        return jsonify({"error": "Nenhum arquivo enviado no campo 'file'"}), 400
+        return jsonify({"error": "No file uploaded in the 'file' field"}), 400
 
     file = request.files["file"]
 
     if file.filename == "":
-        return jsonify({"error": "O arquivo enviado está vazio"}), 400
+        return jsonify({"error": "The uploaded file is empty"}), 400
 
     try:
-        conteudo_inicial = file.stream.read().decode("utf-8")
-        df_header = pd.read_csv(io.StringIO(conteudo_inicial), nrows=0)
+        # [SECURITY/PERFORMANCE] Only read the first line (header) to avoid loading huge files into memory
+        header_line = file.stream.readline().decode("utf-8", errors="replace")
+        df_header = pd.read_csv(io.StringIO(header_line), nrows=0)
         
-        colunas = df_header.columns.tolist()
+        columns = df_header.columns.tolist()
         
-        return jsonify({"colunas": colunas}), 200
+        return jsonify({"colunas": columns}), 200
 
     except Exception as e:
-        return jsonify({"error": f"Erro ao extrair cabeçalhos do arquivo: {str(e)}"}), 500
+        return jsonify({"error": f"Error extracting file headers: {str(e)}"}), 500
 
 
-@app.route("/processar-csv", methods=["POST"])
-def processar_csv():
+@app.route("/process-csv", methods=["POST"])
+def process_csv():
     if "file" not in request.files:
-        return jsonify({"error": "Nenhum arquivo enviado no campo 'file'"}), 400
+        return jsonify({"error": "No file uploaded in the 'file' field"}), 400
 
     file = request.files["file"]
 
     if file.filename == "":
-        return jsonify({"error": "O arquivo enviado está vazio"}), 400
+        return jsonify({"error": "The uploaded file is empty"}), 400
 
-    # 🎛️ CAPTURA DE PARÂMETROS: Adicionamos o 'tipo_grafico' vindo do formulário
-    coluna_x = request.form.get("eixo_x", "categoria")
-    coluna_y = request.form.get("eixo_y", "valor")
-    tipo_grafico = request.form.get("tipo_grafico", "bar")  # Fallback para gráfico de barras
+    # 🎛️ CAPTURE PARAMETERS: Read axis and chart options mapped from backend
+    x_axis = request.form.get("xAxis", "category")
+    y_axis = request.form.get("yAxis", "value")
+    chart_type = request.form.get("chartType", "bar")  # Fallback to bar chart
 
     try:
-        conteudo_arquivo = file.stream.read().decode("utf-8")
-        df = pd.read_csv(io.StringIO(conteudo_arquivo))
+        file_content = file.stream.read().decode("utf-8", errors="replace")
+        df = pd.read_csv(io.StringIO(file_content))
 
-        if coluna_x not in df.columns or coluna_y not in df.columns:
+        if x_axis not in df.columns or y_axis not in df.columns:
             return (
                 jsonify(
                     {
-                        "error": f"Colunas '{coluna_x}' ou '{coluna_y}' não encontradas no arquivo."
+                        "error": f"Columns '{x_axis}' or '{y_axis}' not found in the uploaded file."
                     }
                 ),
                 400,
             )
 
-        # Agrupamento clássico do Pandas
-        df_agrupado = df.groupby(coluna_x)[coluna_y].sum().reset_index()
+        # Standard Pandas aggregation
+        df_grouped = df.groupby(x_axis)[y_axis].sum().reset_index()
 
-        labels = df_agrupado[coluna_x].tolist()
-        valores = df_agrupado[coluna_y].tolist()
+        labels = df_grouped[x_axis].tolist()
+        values = df_grouped[y_axis].tolist()
 
-        # 📊 FORMATAÇÃO INTELIGENTE POR TIPO DE GRÁFICO
-        # Se for pizza ou rosca, algumas engines preferem os valores em formato flat.
-        # Deixamos a estrutura universal pronta para que o Front decida como plotar baseado no 'type'
-        resposta_grafico = {
+        # 📊 SMART FORMATTING BY CHART TYPE
+        # Structure is ready for the frontend to render based on 'type'
+        chart_response = {
             "status": "success",
-            "type": tipo_grafico,  # 'bar', 'line', 'pie' ou 'donut'
+            "type": chart_type,  # 'bar', 'line', 'pie', or 'donut'
             "labels": labels,
             "datasets": [
                 {
-                    "label": f"Soma de {coluna_y.capitalize()} por {coluna_x.capitalize()}",
-                    "data": valores,
+                    "label": f"Sum of {y_axis.capitalize()} by {x_axis.capitalize()}",
+                    "data": values,
                 }
             ],
         }
 
-        return jsonify(resposta_grafico), 200
+        return jsonify(chart_response), 200
 
     except Exception as e:
-        return jsonify({"error": f"Erro interno ao processar dados: {str(e)}"}), 500
+        return jsonify({"error": f"Internal server error processing data: {str(e)}"}), 500
 
 
 if __name__ == "__main__":

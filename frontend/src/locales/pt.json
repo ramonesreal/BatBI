@@ -1,0 +1,88 @@
+{
+  "dashboard": {
+    "title": "Motor Analítico",
+    "subtitle": "Importe arquivos estruturados ou conecte-se a bancos relacionais para insights instantâneos.",
+    "sourceFile": "CSV",
+    "sourceSql": "SQL",
+    "processing": "Processando dados e gerando insights…",
+    "processingDetail": "O motor analítico em Python está em ação.",
+    "newAnalysis": "Nova Análise",
+    "deleteSuccess": "Análise removida.",
+    "exportPdf": "Exportar PDF",
+    "generatingPdf": "Gerando PDF…",
+    "analysisRestored": "Análise restaurada: {{title}}",
+    "errorDelete": "Não foi possível remover o item selecionado.",
+    "errorBatchDelete": "Falha ao remover lote. Tente novamente.",
+    "confirmDelete": "Deseja apagar permanentemente esta análise do histórico?",
+    "confirmBatchDelete": "Deseja apagar permanentemente {{count}} análises selecionadas?"
+  },
+  "mapping": {
+    "title": "Mapeamento de Eixos No-Code",
+    "dataset": "Dataset ativo",
+    "cancel": "Cancelar",
+    "xAxis": "Eixo X (Dimensão)",
+    "yAxis": "Eixo Y (Métrica Numérica)",
+    "chartType": "Tipo de Gráfico",
+    "chartBar": "Gráfico de Barras",
+    "chartLine": "Gráfico de Linhas",
+    "chartPie": "Gráfico de Pizza",
+    "run": "Disparar Motor Analítico",
+    "running": "Processando Motor Analítico…",
+    "errorSameAxis": "O Eixo X e o Eixo Y não podem ser a mesma coluna. Escolha dimensões diferentes."
+  },
+  "chart": {
+    "defaultTitle": "Visualização Analítica",
+    "tooltipTotal": "Valor Total",
+    "tooltipCount": "Quantidade"
+  },
+  "kpi": {
+    "total": "Acumulado Total",
+    "totalBadge": "∑ Soma",
+    "average": "Média Global",
+    "averageBadge": "÷ Média",
+    "peak": "Pico Máximo",
+    "peakBadge": "↑ Maior"
+  },
+  "history": {
+    "title": "Análises Recentes",
+    "selected": "{{count}} selecionada(s)",
+    "selectAll": "Selecionar Tudo",
+    "deselectAll": "Desmarcar Tudo",
+    "deleteSelected": "Excluir Selecionadas",
+    "empty": "Nenhum histórico registrado.",
+    "checkboxLabel": "{{action}} análise: {{title}}",
+    "select": "Selecionar",
+    "deselect": "Desmarcar"
+  },
+  "upload": {
+    "ariaLabel": "Upload de arquivo CSV — arraste e solte ou clique para procurar",
+    "dropActive": "Solte o arquivo para iniciar",
+    "dropIdle": "Arraste seu arquivo .csv aqui",
+    "browseHint": "Ou <1>procure no computador</1>. Arquivos delimitados por vírgula até {{max}} MB.",
+    "loading": "Processando dados na engine…",
+    "loadingDetail": "O motor analítico em Python está decodificando o arquivo.",
+    "errorFormat": "Formato inválido. Por favor, envie apenas arquivos delimitados por vírgula (.csv).",
+    "errorSize": "O arquivo excede o limite de {{max}} MB. Reduza o dataset para processamento."
+  },
+  "sql": {
+    "title": "Credenciais do Banco de Dados PostgreSQL",
+    "subtitleConnected": "Banco de dados conectado.",
+    "subtitleDisconnected": "Assegure-se de que o firewall permite conexões externas na porta especificada.",
+    "disconnect": "Desconectar",
+    "labelHost": "Host / IP",
+    "labelPort": "Porta",
+    "labelUser": "Usuário",
+    "labelPass": "Senha",
+    "labelDbName": "Nome do Banco de Dados",
+    "placeholderHost": "Ex: db.exemplo.com",
+    "placeholderPort": "5432",
+    "placeholderUser": "postgres",
+    "placeholderPass": "••••••••••••",
+    "placeholderDbName": "meu_banco",
+    "connect": "Testar e Conectar Banco",
+    "connecting": "Estabelecendo Conexão…",
+    "labelTable": "Selecione a Tabela para Análise",
+    "mapColumns": "Mapear Colunas da Tabela",
+    "mappingColumns": "Inspecionando Esquema…"
+  }
+}

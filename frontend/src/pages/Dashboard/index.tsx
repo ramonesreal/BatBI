@@ -1,5 +1,6 @@
-import { useState, useEffect, useRef } from 'react'; // 🚀 Adicionado useRef
-import { toPng } from 'html-to-image'; // 🚀 Importado capturador de elementos DOM
+import { useState, useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
+import { toPng } from 'html-to-image';
 import Layout from '../../components/Layout';
 import UploadZone from '../../components/UploadZone';
 import DashboardChart from '../../components/DashboardChart';
@@ -10,236 +11,251 @@ import { KpiCards } from '../../components/KpiCards';
 import { api } from '../../services/api';
 import { exportService } from '../../services/exportService';
 
-interface HistoricoItem {
+interface HistoryItem {
   id: string;
-  titulo: string;
+  title: string;
   createdAt: string;
   chartData: any;
 }
 
+interface AnalysisConfig {
+  xAxis: string;
+  yAxis: string;
+  chartType: string;
+}
+
 export default function Dashboard() {
+  const { t } = useTranslation();
+
   const [uploading, setUploading] = useState(false);
   const [inspecting, setInspecting] = useState(false);
   const [loadingDb, setLoadingDb] = useState(false);
-  const [erro, setErro] = useState('');
-  const [sucesso, setSucesso] = useState('');
+  const [exportingPdf, setExportingPdf] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   const [chartData, setChartData] = useState<any>(null);
-  const [origemDados, setOrigemDados] = useState<'file' | 'sql'>('file');
-
+  const [dataSource, setDataSource] = useState<'file' | 'sql'>('file');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [tabelaAtiva, setTabelaAtiva] = useState<string | null>(null);
-  const [dbConfigAtivo, setDbConfigAtivo] = useState<any>(null);
-  const [colunas, setColunas] = useState<string[]>([]);
-  const [historico, setHistorico] = useState<HistoricoItem[]>([]);
+  const [activeTable, setActiveTable] = useState<string | null>(null);
+  const [activeDbConfig, setActiveDbConfig] = useState<any>(null);
+  const [columns, setColumns] = useState<string[]>([]);
+  const [history, setHistory] = useState<HistoryItem[]>([]);
+  const chartAreaRef = useRef<HTMLDivElement>(null);
 
-  const areaDoGraficoRef = useRef<HTMLDivElement>(null); // 🚀 Referência magnética para "fotografar" o canvas
-
-  const tokenHeaders = () => ({ headers: { 'Authorization': `Bearer ${localStorage.getItem('@BatBI:token')}` } });
-
-  const carregarHistorico = async () => {
+  const loadHistory = async () => {
     try {
-      const response = await api.get('/analytics/history', tokenHeaders());
-      const historicoFormatado = response.data.map((item: any) => ({
-        ...item,
-        chartData: typeof item.chartData === 'string' ? JSON.parse(item.chartData) : item.chartData
-      }));
-      setHistorico(historicoFormatado);
-    } catch (err) { console.error(err); }
+      const response = await api.get('/analytics/history');
+      const normalized = response.data.map((item: any) => {
+        const verifiedId = item.id ?? item._id ?? item.dashboardId;
+
+        return {
+          ...item,
+          id: verifiedId ? String(verifiedId) : '',
+          title: item.title ?? item.titulo ?? 'Untitled Analysis',
+          chartData: typeof item.chartData === 'string'
+            ? JSON.parse(item.chartData)
+            : item.chartData,
+        };
+      });
+
+      setHistory(normalized.filter((item: any) => item.id !== ''));
+    } catch (err) {
+      console.error('[Dashboard] Failed to load analysis history:', err);
+    }
   };
 
-  useEffect(() => { carregarHistorico(); }, []);
+  useEffect(() => { loadHistory(); }, []);
 
-  const handleTestarConexao = async (dbConfig: any) => {
-    setLoadingDb(true); setErro(''); setSucesso('');
+  const handleTestConnection = async (dbConfig: any) => {
+    setLoadingDb(true); setError(''); setSuccess('');
     try {
-      const response = await api.post('/analytics/db-test', dbConfig, tokenHeaders());
-      setSucesso(response.data.message || 'Conexão estabelecida com sucesso!');
-      return response.data.tabelas || [];
+      const response = await api.post('/analytics/db-test', dbConfig);
+      setSuccess(response.data.message || t('sql.subtitleConnected'));
+      return (response.data.tables ?? response.data.tabelas) || [];
     } catch (err: any) {
-      setErro(err.response?.data?.error || 'Erro ao tentar conectar ao banco externo.');
+      setError(err.response?.data?.error || t('sql.subtitleDisconnected'));
     } finally { setLoadingDb(false); }
   };
 
-  const handleMapearColunas = async (dbConfig: any, tabelaSelecionada: string) => {
-    setErro(''); setSucesso('');
+  const handleMapColumns = async (dbConfig: any, selectedTable: string) => {
+    setError(''); setSuccess('');
     try {
-      const response = await api.post('/analytics/db-columns', { ...dbConfig, tabela: tabelaSelecionada }, tokenHeaders());
-      setColunas(response.data.colunas || []);
-      setTabelaAtiva(tabelaSelecionada);
-      setDbConfigAtivo(dbConfig);
+      const response = await api.post('/analytics/db-columns', { ...dbConfig, tableName: selectedTable });
+      setColumns((response.data.columns ?? response.data.colunas) || []);
+      setActiveTable(selectedTable);
+      setActiveDbConfig(dbConfig);
     } catch (err: any) {
-      setErro(err.response?.data?.error || 'Não foi possível ler as colunas desta tabela.');
+      setError(err.response?.data?.error || t('sql.mappingColumns'));
     }
   };
 
-  const handleDeletarItem = async (id: string) => {
-    if (!confirm('Deseja realmente apagar esta análise do seu histórico?')) return;
+  const handleDeleteItem = async (id: string) => {
+    if (!confirm(t('dashboard.confirmDelete'))) return;
     try {
-      await api.delete(`/analytics/history/${id}`, tokenHeaders());
+      await api.delete(`/analytics/history/${id}`);
       if (chartData?.dashboardId === id) setChartData(null);
-      setSucesso('Análise removida.'); carregarHistorico();
-    } catch { setErro('Não foi possível remover o item.'); }
+      setSuccess(t('dashboard.deleteSuccess')); loadHistory();
+    } catch { setError(t('dashboard.errorDelete')); }
   };
 
-  const handleDeletarEmLote = async (ids: string[]) => {
-    if (!confirm(`Deseja apagar as ${ids.length} análises?`)) return;
+  const handleBatchDelete = async (ids: string[]) => {
+    if (!confirm(t('dashboard.confirmBatchDelete', { count: ids.length }))) return;
     try {
-      await api.delete('/analytics/history', { data: { ids }, ...tokenHeaders() });
+      await api.delete('/analytics/history', { data: { ids } });
       if (chartData && ids.includes(chartData.dashboardId)) setChartData(null);
-      setSucesso('Análises limpas.'); carregarHistorico();
-    } catch { setErro('Falha ao remover lote.'); }
+      setSuccess(t('history.deleteSuccess') || 'Analysis deleted successfully!'); loadHistory();
+    } catch { setError(t('dashboard.errorBatchDelete')); }
   };
 
   const handleFileChange = async (file: File) => {
-    setInspecting(true); setErro(''); setSucesso(''); setChartData(null);
-    const formData = new FormData(); formData.append('file', file);
+    setInspecting(true); setError(''); setSuccess(''); setChartData(null);
+    const formData = new FormData();
+    formData.append('file', file);
     try {
       const response = await api.post('/analytics/inspect', formData, {
-        headers: { 'Content-Type': 'multipart/form-data', ...tokenHeaders().headers }
+        headers: { 'Content-Type': 'multipart/form-data' },
       });
-      setColunas(response.data.colunas || []); setSelectedFile(file);
+      setColumns((response.data.columns ?? response.data.colunas) || []);
+      setSelectedFile(file);
     } catch (err: any) {
-      setErro(err.response?.data?.error || 'Erro ao ler colunas do CSV.'); setSelectedFile(null);
+      setError(err.response?.data?.error || t('upload.errorFormat'));
+      setSelectedFile(null);
     } finally { setInspecting(false); }
   };
 
-  const handleProcessData = async (config: { eixoX: string; eixoY: string; tipoGrafico: string }) => {
-    setUploading(true); setErro(''); setSucesso('');
-
+  const handleProcessData = async (config: AnalysisConfig) => {
+    setUploading(true); setError(''); setSuccess('');
     try {
-      if (origemDados === 'file' && selectedFile) {
+      if (dataSource === 'file' && selectedFile) {
         const formData = new FormData();
         formData.append('file', selectedFile);
-        formData.append('eixo_x', config.eixoX);
-        formData.append('eixo_y', config.eixoY);
-        formData.append('tipo_grafico', config.tipoGrafico);
-
+        formData.append('xAxis', config.xAxis);
+        formData.append('yAxis', config.yAxis);
+        formData.append('chartType', config.chartType);
         const response = await api.post('/analytics/upload', formData, {
-          headers: { 'Content-Type': 'multipart/form-data', ...tokenHeaders().headers }
+          headers: { 'Content-Type': 'multipart/form-data' },
         });
         setChartData(response.data); setSelectedFile(null);
-      } else if (origemDados === 'sql' && dbConfigAtivo && tabelaAtiva) {
-        const payload = {
-          ...dbConfigAtivo,
-          tabela: tabelaAtiva,
-          eixo_x: config.eixoX,
-          eixo_y: config.eixoY,
-          tipo_grafico: config.tipoGrafico
-        };
-        const response = await api.post('/analytics/query', payload, tokenHeaders());
-        setChartData(response.data); setTabelaAtiva(null);
+      } else if (dataSource === 'sql' && activeDbConfig && activeTable) {
+        const payload = { ...activeDbConfig, tableName: activeTable, xAxis: config.xAxis, yAxis: config.yAxis, chartType: config.chartType };
+        const response = await api.post('/analytics/query', payload);
+        setChartData(response.data); setActiveTable(null);
       }
-      carregarHistorico();
+      loadHistory();
     } catch (err: any) {
-      setErro(err.response?.data?.error || 'Falha ao processar os dados analíticos.');
+      setError(err.response?.data?.error || t('dashboard.processing'));
     } finally { setUploading(false); }
   };
 
-  const [exportandoPdf, setExportandoPdf] = useState(false);
-
-  const handleExportarPdf = async () => {
-    if (!chartData || !areaDoGraficoRef.current) return;
-
-    setExportandoPdf(true);
-    setErro('');
-    setSucesso('');
-
+  const handleExportPdf = async () => {
+    if (!chartData || !chartAreaRef.current) return;
+    setExportingPdf(true); setError(''); setSuccess('');
     try {
-      // 📸 Extrai instantaneamente o print em Base64 do container do Recharts
-      const graficoBase64 = await toPng(areaDoGraficoRef.current, {
-        backgroundColor: '#020617', // Força a cor slate-950 de fundo clássica do BatBI
-        style: { padding: '12px' }
+      const chartImageBase64 = await toPng(chartAreaRef.current, {
+        backgroundColor: '#020617', style: { padding: '12px' },
       });
-
-      // 🚀 Passa o Base64 gerado diretamente no payload do serviço modular
-      await exportService.baixarRelatorioPdf({
-        titulo: chartData.datasets?.[0]?.label || 'Analise_BatBI',
+      await exportService.downloadReportPdf({
+        title: chartData.datasets?.[0]?.label || 'BatBI_Analysis',
         kpis: chartData.kpis,
         labels: chartData.labels,
         datasets: chartData.datasets,
-        graficoImg: graficoBase64 // 🔥 Injeção dinâmica da imagem tratada
+        chartImage: chartImageBase64,
       }, chartData.dashboardId);
-
-      setSucesso('Relatório em PDF exportado com sucesso!');
+      setSuccess(t('dashboard.exportPdf'));
     } catch (err: any) {
-      console.error(err);
-      setErro('Não foi possível gerar a exportação em PDF do relatório atual.');
-    } finally {
-      setExportandoPdf(false);
-    }
+      console.error('[Dashboard] PDF export error:', err);
+      setError(t('dashboard.generatingPdf'));
+    } finally { setExportingPdf(false); }
   };
 
-  const limparFluxoAtual = () => {
-    setChartData(null);
-    setSelectedFile(null);
-    setTabelaAtiva(null);
-    setColunas([]);
+  const clearCurrentFlow = () => {
+    setChartData(null); setSelectedFile(null);
+    setActiveTable(null); setColumns([]);
+    setError(''); setSuccess('');
   };
 
   return (
     <Layout>
       <div className="mb-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-white">Motor Analítico de Gotham</h2>
-          <p className="text-sm text-gray-400 mt-1">Importe arquivos estruturados ou acesse bases relacionais.</p>
+          <h2 className="text-2xl font-bold text-white">{t('dashboard.title')}</h2>
+          <p className="text-sm text-gray-400 mt-1">{t('dashboard.subtitle')}</p>
         </div>
-        {!chartData && !selectedFile && !tabelaAtiva && (
+        {!chartData && !selectedFile && !activeTable && (
           <div className="flex bg-gray-950 p-1 rounded-xl border border-gray-800 self-start">
-            <button onClick={() => { setOrigemDados('file'); setColunas([]); }} className={`px-4 py-2 text-xs font-bold rounded-lg ${origemDados === 'file' ? 'bg-yellow-500 text-gray-950' : 'text-gray-400'}`}>📁 CSV</button>
-            <button onClick={() => { setOrigemDados('sql'); setColunas([]); }} className={`px-4 py-2 text-xs font-bold rounded-lg ${origemDados === 'sql' ? 'bg-yellow-500 text-gray-950' : 'text-gray-400'}`}>🔌 SQL</button>
+            <button
+              id="source-toggle-csv"
+              onClick={() => { setDataSource('file'); setColumns([]); }}
+              className={`px-4 py-2 text-xs font-bold rounded-lg transition-colors ${dataSource === 'file' ? 'bg-yellow-500 text-gray-950' : 'text-gray-400 hover:text-gray-200'}`}
+            >
+              📁 {t('dashboard.sourceFile')}
+            </button>
+            <button
+              id="source-toggle-sql"
+              onClick={() => { setDataSource('sql'); setColumns([]); }}
+              className={`px-4 py-2 text-xs font-bold rounded-lg transition-colors ${dataSource === 'sql' ? 'bg-yellow-500 text-gray-950' : 'text-gray-400 hover:text-gray-200'}`}
+            >
+              🔌 {t('dashboard.sourceSql')}
+            </button>
           </div>
         )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
         <div className="lg:col-span-2 space-y-6">
-          {erro && <div className="rounded-xl bg-red-950/40 border border-red-800 p-4 text-sm text-red-400">⚠️ {erro}</div>}
-          {sucesso && <div className="rounded-xl bg-green-950/40 border border-green-800 p-4 text-sm text-green-400">✅ {sucesso}</div>}
+          {error && (
+            <div id="dashboard-error-banner" role="alert" aria-live="assertive"
+              className="rounded-xl bg-red-950/40 border border-red-800 p-4 text-sm text-red-400 flex items-start gap-2">
+              <span aria-hidden="true">⚠️</span><span>{error}</span>
+            </div>
+          )}
+          {success && (
+            <div id="dashboard-success-banner" role="status" aria-live="polite"
+              className="rounded-xl bg-green-950/40 border border-green-800 p-4 text-sm text-green-400 flex items-start gap-2">
+              <span aria-hidden="true">✅</span><span>{success}</span>
+            </div>
+          )}
 
-          {origemDados === 'file' && !selectedFile && !uploading && !inspecting && !chartData && (
+          {dataSource === 'file' && !selectedFile && !uploading && !inspecting && !chartData && (
             <UploadZone onFileSelected={handleFileChange} loading={inspecting} />
           )}
-
-          {origemDados === 'sql' && !tabelaAtiva && !chartData && (
-            <SqlForm onTestarConexao={handleTestarConexao} onMapearColunas={handleMapearColunas} loading={loadingDb} />
+          {dataSource === 'sql' && !activeTable && !chartData && (
+            <SqlForm onTestConnection={handleTestConnection} onMapColumns={handleMapColumns} loading={loadingDb} />
           )}
-
-          {((origemDados === 'file' && selectedFile) || (origemDados === 'sql' && tabelaAtiva)) && colunas.length > 0 && (
+          {((dataSource === 'file' && selectedFile) || (dataSource === 'sql' && activeTable)) && columns.length > 0 && (
             <CsvMappingForm
-              filename={selectedFile ? selectedFile.name : `Tabela: ${tabelaAtiva}`}
-              colunas={colunas}
-              onCancelar={limparFluxoAtual}
-              onProcessar={handleProcessData}
+              filename={selectedFile ? selectedFile.name : `Table: ${activeTable}`}
+              columns={columns}
+              onCancel={clearCurrentFlow}
+              onProcess={handleProcessData}
+              loading={uploading}
             />
           )}
 
-          {uploading && <div className="flex flex-col items-center justify-center p-12 bg-gray-900/30 border border-dashed rounded-2xl"><span className="text-4xl animate-spin mb-4">⚙️</span><p className="text-sm text-yellow-500">Processando e gerando insights...</p></div>}
+          {uploading && (
+            <div className="flex flex-col items-center justify-center p-12 bg-gray-900/30 border border-dashed border-gray-700 rounded-2xl">
+              <span className="text-4xl animate-spin mb-4" aria-hidden="true">⚙️</span>
+              <p className="text-sm text-yellow-500 font-medium">{t('dashboard.processing')}</p>
+              <p className="text-xs text-gray-500 mt-1">{t('dashboard.processingDetail')}</p>
+            </div>
+          )}
 
-          {/* 📊 ÁREA DE RENDERIZAÇÃO DOS INSIGHTS + CARDS DE KPIS */}
           {chartData && (
             <div className="space-y-4 animate-fadeIn">
               <KpiCards kpis={chartData.kpis} />
               <div className="flex items-center justify-between bg-gray-900 border border-gray-800 px-4 py-2.5 rounded-xl">
-                <button
-                  onClick={handleExportarPdf}
-                  disabled={exportandoPdf}
-                  className="flex items-center gap-2 px-3 py-1.5 text-xs font-bold rounded-lg bg-yellow-500 hover:bg-yellow-600 text-gray-950 transition-colors disabled:opacity-50"
-                >
-                  {exportandoPdf ? (
-                    <>
-                      <span className="animate-spin">⏳</span> Gerando PDF...
-                    </>
-                  ) : (
-                    <>
-                      <span>📄</span> Exportar PDF
-                    </>
-                  )}
+                <button id="export-pdf-btn" onClick={handleExportPdf} disabled={exportingPdf}
+                  className="flex items-center gap-2 px-3 py-1.5 text-xs font-bold rounded-lg bg-yellow-500 hover:bg-yellow-400 text-gray-950 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                  {exportingPdf
+                    ? <><span className="animate-spin" aria-hidden="true">⏳</span> {t('dashboard.generatingPdf')}</>
+                    : <><span aria-hidden="true">📄</span> {t('dashboard.exportPdf')}</>}
                 </button>
-                <button onClick={limparFluxoAtual} className="px-3 py-1 text-xs font-bold rounded-lg bg-gray-950 text-gray-400 hover:text-yellow-500">🧹 Nova Análise</button>
+                <button id="new-analysis-btn" onClick={clearCurrentFlow}
+                  className="px-3 py-1 text-xs font-bold rounded-lg bg-gray-950 text-gray-400 hover:text-yellow-500 transition-colors">
+                  🧹 {t('dashboard.newAnalysis')}
+                </button>
               </div>
-
-              {/* 🚀 Gráfico envolvido na div de captura com a referência atribuída */}
-              <div ref={areaDoGraficoRef} className="rounded-xl overflow-hidden">
+              <div ref={chartAreaRef} className="rounded-xl overflow-hidden">
                 <DashboardChart data={chartData} />
               </div>
             </div>
@@ -247,11 +263,11 @@ export default function Dashboard() {
         </div>
 
         <HistorySidebar
-          historico={historico}
-          dashboardIdAtivo={chartData?.dashboardId}
-          onSelecionarGrafico={(data, t) => { setChartData(data); setSucesso(`Restaurado: ${t}`); }}
-          onDeletarItem={handleDeletarItem}
-          onDeletarEmLote={handleDeletarEmLote}
+          history={history}
+          activeDashboardId={chartData?.dashboardId}
+          onSelectChart={(data, title) => { setChartData(data); setSuccess(t('dashboard.analysisRestored', { title })); }}
+          onDeleteItem={handleDeleteItem}
+          onBatchDelete={handleBatchDelete}
         />
       </div>
     </Layout>

@@ -1,76 +1,83 @@
+// analytics.routes.ts
 import { Router } from 'express';
 import multer from 'multer';
 import { analyticsController } from './analytics.controller';
-import { autenticacaoMiddleware } from '../auth/auth.middleware';
+import { authMiddleware } from '../auth/auth.middleware';
 
 const analyticsRoutes = Router();
 
 const storage = multer.memoryStorage();
 const upload = multer({ storage: storage });
 
-// Inspeciona o arquivo e retorna as colunas para os <select>
+// Inspects the uploaded file and returns columns for <select> elements
 analyticsRoutes.post(
   '/inspect',
-  autenticacaoMiddleware,
+  authMiddleware,
   upload.single('file'),
-  analyticsController.inspecionarCsv
+  analyticsController.inspectCsv
 );
 
-// Processa os eixos e gera o gráfico final
+// Processes axes and generates the final chart
 analyticsRoutes.post(
-  '/upload', 
-  autenticacaoMiddleware, 
-  upload.single('file'), 
-  analyticsController.processarCsv
+  '/upload',
+  authMiddleware,
+  upload.single('file'),
+  analyticsController.processCsv
 );
 
-// Listar histórico de análises do usuário
+// List user's analysis history
 analyticsRoutes.get(
-  '/history', 
-  autenticacaoMiddleware, 
-  analyticsController.listarHistorico
-);
-
-analyticsRoutes.delete(
   '/history',
-  autenticacaoMiddleware,
-  analyticsController.deletarHistorico
+  authMiddleware,
+  analyticsController.listHistory
+);
+
+// Handles deleting all history or a specific item by ID
+analyticsRoutes.delete(
+  '/history', // For deleting all history (with query param 'all=true')
+  authMiddleware,
+  analyticsController.deleteHistory
 );
 
 analyticsRoutes.delete(
-  '/history/:id',
-  autenticacaoMiddleware,
-  analyticsController.deletarHistorico
+  '/history/:id', // For deleting a specific history item by ID
+  authMiddleware,
+  analyticsController.deleteHistory
 );
 
+// Tests a database connection
 analyticsRoutes.post(
   '/db-test',
-  autenticacaoMiddleware,
-  analyticsController.testarConexaoBanco
+  authMiddleware,
+  analyticsController.testDatabaseConnection
 );
 
+// Retrieves database tables
 analyticsRoutes.post(
   '/db-tables',
-  autenticacaoMiddleware,
-  analyticsController.obterTabelasBanco
+  authMiddleware,
+  analyticsController.getDatabaseTables
 );
 
+// Retrieves columns for a specific database table
 analyticsRoutes.post(
   '/db-columns',
-  autenticacaoMiddleware,
-  analyticsController.obterColunasBanco
+  authMiddleware,
+  analyticsController.getDatabaseColumns
 );
 
+// Processes a database query and returns chart data
 analyticsRoutes.post(
   '/query',
-  autenticacaoMiddleware,
-  analyticsController.processarQueryBanco
+  authMiddleware,
+  analyticsController.processDatabaseQuery
 );
 
+// Exports the dashboard as a PDF report
 analyticsRoutes.post(
   '/export-pdf',
-  autenticacaoMiddleware,
-  analyticsController.exportarPdf
+  authMiddleware,
+  analyticsController.exportPdf
 );
 
 export default analyticsRoutes;

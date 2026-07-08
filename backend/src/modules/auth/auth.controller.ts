@@ -1,92 +1,113 @@
 import { Request, Response } from 'express';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
-import prisma from '../../database'; // Puxa nossa conexão central do Prisma
+import prisma from '../../database'; // Main Prisma client connection
 import { env } from '../../config/env';
 
 export const authController = {
-  // 1. ROTA DE CADASTRO (SIGNUP)
-  async cadastro(req: Request, res: Response): Promise<any> {
+  // 1. SIGNUP ROUTE
+  async signup(req: Request, res: Response): Promise<any> {
     try {
-      const { nome, email, senha } = req.body;
+      const { name, email, password } = req.body;
 
-      // Validação básica de campos obrigatórios
-      if (!nome || !email || !senha) {
-        return res.status(400).json({ error: 'Por favor, preencha todos os campos.' });
+      // Basic validation for required fields
+      if (!name || !email || !password) {
+        return res.status(400).json({ error: 'Please fill in all fields.' });
       }
 
-      // Verifica se o e-mail já está cadastrado no banco do Neon
-      const usuarioExiste = await prisma.user.findUnique({ where: { email } });
-      if (usuarioExiste) {
-        return res.status(400).json({ error: 'Este e-mail já está em uso.' });
+      // Check password complexity (minimum 8 characters)
+      if (password.length < 8) {
+        return res.status(400).json({ error: 'Password must be at least 8 characters long.' });
       }
 
-      // Criptografia: Embaralha a senha usando um salt de 10 rounds
-      const senhaCriptografada = await bcrypt.hash(senha, 10);
+      // Check if email is already registered in the database
+      const userExists = await prisma.user.findUnique({ where: { email } });
+      if (userExists) {
+        return res.status(400).json({ error: 'This email is already in use.' });
+      }
 
-      // Salva o novo usuário fisicamente no banco de dados
-      const novoUsuario = await prisma.user.create({
+      // Hash the password with 10 salt rounds
+      const hashedPassword = await bcrypt.hash(password, 10);
+
+      // Save the new user in the database
+      const newUser = await prisma.user.create({
         data: {
-          nome,
+          nome: name,
           email,
-          senha: senhaCriptografada,
+          senha: hashedPassword,
         },
       });
 
-      // Retorna sucesso sem expor a senha hash por segurança
+      // Return success without exposing the hashed password
       return res.status(201).json({
-        message: 'Usuário criado com sucesso!',
-        user: { id: novoUsuario.id, nome: novoUsuario.nome, email: novoUsuario.email }
+        message: 'User created successfully!',
+        user: { id: newUser.id, name: newUser.nome, email: newUser.email }
       });
 
     } catch (error: any) {
-      console.error('Erro no cadastro:', error.message);
-      return res.status(500).json({ error: 'Erro interno ao cadastrar usuário.' });
+      console.error('Signup error:', error.message);
+      return res.status(500).json({ error: 'Internal server error while registering user.' });
     }
   },
-  // 2. ROTA DE LOGIN (SIGNIN)
+  // 2. SIGNIN / LOGIN ROUTE
   async login(req: Request, res: Response): Promise<any> {
     try {
-      const { email, senha } = req.body;
+      const { email, password } = req.body;
 
-      // Validação de campos
-      if (!email || !senha) {
-        return res.status(400).json({ error: 'Por favor, informe o e-mail e a senha.' });
+      // Check for required fields
+      if (!email || !password) {
+        return res.status(400).json({ error: 'Please provide email and password.' });
       }
 
-      // 1. Busca o usuário pelo e-mail
-      const usuario = await prisma.user.findUnique({ where: { email } });
-      if (!usuario) {
-        return res.status(401).json({ error: 'E-mail ou senha inválidos.' });
+      // 1. Find user by email
+      const user = await prisma.user.findUnique({ where: { email } });
+      if (!user) {
+        return res.status(401).json({ error: 'Invalid email or password.' });
       }
 
-      // 2. Compara a senha digitada com a criptografada no banco
-      const senhaCorreta = await bcrypt.compare(senha, usuario.senha);
-      if (!senhaCorreta) {
-        return res.status(401).json({ error: 'E-mail ou senha inválidos.' });
+      // 2. Compare password hashes
+      const isPasswordCorrect = await bcrypt.compare(password, user.senha);
+      if (!isPasswordCorrect) {
+        return res.status(401).json({ error: 'Invalid email or password.' });
       }
 
-      // 3. Gera o Token JWT contendo o ID e o E-mail do usuário, durando 1 dia
+      // 3. Generate JWT Token containing user ID and Email, expiring in 1 day
       const token = jwt.sign(
-        { id: usuario.id },
+        { id: user.id, email: user.email },
         env.jwtSecret,
-        { expiresIn: '1d' }
+        { expiresIn: '1d', algorithm: 'HS256' }
       );
 
-      // 4. Retorna o token de acesso e os dados básicos do usuário logado
+      // Set JWT token as HTTP-Only, Secure, SameSite=Strict cookie
+      res.cookie('token', token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 24 * 60 * 60 * 1000 // 1 day
+      });
+
+      // 4. Return user info (token is not sent in the JSON body anymore for security)
       return res.json({
-        message: 'Login realizado com sucesso!',
-        token,
+        message: 'Login successful!',
         user: {
-          id: usuario.id,
-          nome: usuario.nome,
-          email: usuario.email
+          id: user.id,
+          name: user.nome,
+          email: user.email
         }
       });
 
     } catch (error: any) {
-      console.error('Erro no login:', error.message);
-      return res.status(500).json({ error: 'Erro interno ao tentar fazer login.' });
+      console.error('Login error:', error.message);
+      return res.status(500).json({ error: 'Internal server error during login.' });
     }
+  },
+  // 3. LOGOUT ROUTE
+  async logout(_req: Request, res: Response): Promise<any> {
+    res.clearCookie('token', {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict'
+    });
+    return res.json({ message: 'Logout successful!' });
   }
 };

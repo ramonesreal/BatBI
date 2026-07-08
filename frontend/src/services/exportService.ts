@@ -1,12 +1,16 @@
 import { api } from './api';
 
+// ------------------------------------------------------------
+// Types
+// ------------------------------------------------------------
+
 interface ExportPdfPayload {
-  titulo: string;
+  title: string;         // ✅ renamed from 'titulo'
   kpis: {
     total: number;
-    maior: number;
-    media: number;
-    sufixo?: string;
+    maior: number;       // backend field — kept as-is
+    media: number;       // backend field — kept as-is
+    sufixo?: string;     // backend field — optional unit prefix
   };
   labels: string[];
   datasets: Array<{
@@ -14,38 +18,48 @@ interface ExportPdfPayload {
     data: number[];
     [key: string]: any;
   }>;
-  graficoImg: string; // 🚀 Propriedade mantida com sucesso
+  chartImage: string;    // ✅ renamed from 'graficoImg'
 }
 
+// ------------------------------------------------------------
+// Service
+// ------------------------------------------------------------
+
 export const exportService = {
-  async baixarRelatorioPdf(payload: ExportPdfPayload, dashboardId?: string): Promise<void> {
-    const token = localStorage.getItem('@BatBI:token');
+  /**
+   * Requests a PDF report from the backend and triggers a browser download.
+   * Authentication is handled automatically via the HttpOnly secure cookie
+   * (no manual token retrieval required).
+   */
+  async downloadReportPdf(payload: ExportPdfPayload, dashboardId?: string): Promise<void> {
+    // Dispatch the complete payload — including the captured chart screenshot — to the backend
+    const response = await api.post(
+      '/analytics/export-pdf',
+      {
+        titulo: payload.title,          // backend still expects 'titulo' — bridge mapping
+        kpis: payload.kpis,
+        labels: payload.labels,
+        datasets: payload.datasets,
+        graficoImg: payload.chartImage, // backend still expects 'graficoImg' — bridge mapping
+      },
+      {
+        responseType: 'blob', // Puppeteer returns raw binary PDF data
+      }
+    );
 
-    // 📡 Disparo contra o backend passando o pacote completo incluindo o print do gráfico
-    const response = await api.post('/analytics/export-pdf', {
-      titulo: payload.titulo,
-      kpis: payload.kpis,
-      labels: payload.labels,
-      datasets: payload.datasets,
-      graficoImg: payload.graficoImg
-    }, {
-      headers: { Authorization: `Bearer ${token}` },
-      responseType: 'blob', // 🔥 Crucial: Trata a resposta do Puppeteer como dados binários crus
-    });
-
-    // 📄 Criação do arquivo físico em memória no Navegador para disparo de download
+    // Build an in-memory blob URL and trigger the browser download
     const blob = new Blob([response.data], { type: 'application/pdf' });
-    const url = window.URL.createObjectURL(blob);
+    const url  = window.URL.createObjectURL(blob);
     const link = document.createElement('a');
-    
+
     link.href = url;
-    link.setAttribute('download', `Relatorio_${dashboardId || 'BatBI'}.pdf`);
-    
+    link.setAttribute('download', `Report_${dashboardId || 'BatBI'}.pdf`);
+
     document.body.appendChild(link);
     link.click();
-    
-    // 🧹 Limpeza cirúrgica da memória para evitar vazamento de dados (Memory Leak)
+
+    // Clean up — release object URL to prevent memory leaks
     link.parentNode?.removeChild(link);
     window.URL.revokeObjectURL(url);
-  }
+  },
 };

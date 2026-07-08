@@ -1,0 +1,88 @@
+{
+  "dashboard": {
+    "title": "Analytical Engine",
+    "subtitle": "Import structured files or connect to relational databases for instant insights.",
+    "sourceFile": "CSV",
+    "sourceSql": "SQL",
+    "processing": "Processing data and generating insights…",
+    "processingDetail": "The Python data engine is at work.",
+    "newAnalysis": "New Analysis",
+    "deleteSuccess": "Analysis deleted.",
+    "exportPdf": "Export PDF",
+    "generatingPdf": "Generating PDF…",
+    "analysisRestored": "Analysis restored: {{title}}",
+    "errorDelete": "Could not delete the selected item.",
+    "errorBatchDelete": "Batch deletion failed. Please try again.",
+    "confirmDelete": "Permanently delete this analysis from your history?",
+    "confirmBatchDelete": "Permanently delete {{count}} selected analyses?"
+  },
+  "mapping": {
+    "title": "No-Code Axis Mapping",
+    "dataset": "Active dataset",
+    "cancel": "Cancel",
+    "xAxis": "X Axis (Dimension)",
+    "yAxis": "Y Axis (Numeric Metric)",
+    "chartType": "Chart Type",
+    "chartBar": "Bar Chart",
+    "chartLine": "Line Chart",
+    "chartPie": "Pie Chart",
+    "run": "Run Analytical Engine",
+    "running": "Processing Analytical Engine…",
+    "errorSameAxis": "X Axis and Y Axis cannot be the same column. Choose distinct dimensions."
+  },
+  "chart": {
+    "defaultTitle": "Analytical Visualisation",
+    "tooltipTotal": "Total Value",
+    "tooltipCount": "Count"
+  },
+  "kpi": {
+    "total": "Total Accumulated",
+    "totalBadge": "∑ Sum",
+    "average": "Global Average",
+    "averageBadge": "÷ Avg",
+    "peak": "Peak Maximum",
+    "peakBadge": "↑ Max"
+  },
+  "history": {
+    "title": "Recent Analyses",
+    "selected": "{{count}} selected",
+    "selectAll": "Select All",
+    "deselectAll": "Deselect All",
+    "deleteSelected": "Delete Selected",
+    "empty": "No analysis history yet.",
+    "checkboxLabel": "{{action}} analysis: {{title}}",
+    "select": "Select",
+    "deselect": "Deselect"
+  },
+  "upload": {
+    "ariaLabel": "Upload CSV file — drag and drop or click to browse",
+    "dropActive": "Drop the file to start",
+    "dropIdle": "Drag your .csv file here",
+    "browseHint": "Or <1>browse your computer</1>. Comma-separated files up to {{max}} MB.",
+    "loading": "Processing data in the engine…",
+    "loadingDetail": "The Python analytical engine is decoding your file.",
+    "errorFormat": "Invalid format. Please upload a comma-separated values file (.csv).",
+    "errorSize": "File exceeds the {{max}} MB limit. Please reduce the dataset size before uploading."
+  },
+  "sql": {
+    "title": "PostgreSQL Database Credentials",
+    "subtitleConnected": "Database connected.",
+    "subtitleDisconnected": "Ensure your firewall allows external connections on the specified port.",
+    "disconnect": "Disconnect",
+    "labelHost": "Host / IP",
+    "labelPort": "Port",
+    "labelUser": "Username",
+    "labelPass": "Password",
+    "labelDbName": "Database Name",
+    "placeholderHost": "e.g. db.example.com",
+    "placeholderPort": "5432",
+    "placeholderUser": "postgres",
+    "placeholderPass": "••••••••••••",
+    "placeholderDbName": "my_database",
+    "connect": "Test & Connect Database",
+    "connecting": "Establishing Connection…",
+    "labelTable": "Select Table for Analysis",
+    "mapColumns": "Map Table Columns",
+    "mappingColumns": "Inspecting Schema…"
+  }
+}

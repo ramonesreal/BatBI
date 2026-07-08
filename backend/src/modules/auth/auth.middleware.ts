@@ -2,45 +2,47 @@ import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { env } from '../../config/env';
 
-// Interface para estender o Request do Express e permitir guardar o usuário logado dentro dele
-export interface RequestAutenticado extends Request {
-  usuarioLogado?: {
+// Interface to extend Express Request to hold the logged-in user details
+export interface AuthenticatedRequest extends Request {
+  currentUser?: {
     id: string;
     email: string;
   };
 }
 
-export const autenticacaoMiddleware = (
-  req: RequestAutenticado,
+export const authMiddleware = (
+  req: AuthenticatedRequest,
   res: Response,
   next: NextFunction
 ): any => {
-  // 1. Pega o cabeçalho 'Authorization' da requisição
-  const authHeader = req.headers.authorization;
+  // 1. Attempt to get token from req.cookies
+  let token = req.cookies?.token;
 
-  if (!authHeader) {
-    return res.status(401).json({ error: 'Token não fornecido. Acesso negado.' });
+  // Fallback: check Authorization header
+  if (!token) {
+    const authHeader = req.headers.authorization;
+    if (authHeader) {
+      const parts = authHeader.split(' ');
+      if (parts.length === 2 && parts[0] === 'Bearer') {
+        token = parts[1];
+      }
+    }
   }
 
-  // O padrão de envio do token é "Bearer <TOKEN>". Vamos separar a palavra 'Bearer' do token real.
-  const partes = authHeader.split(' ');
-
-  if (partes.length !== 2 || partes[0] !== 'Bearer') {
-    return res.status(401).json({ error: 'Token malformatado. Acesso negado.' });
+  if (!token) {
+    return res.status(401).json({ error: 'Token not provided. Access denied.' });
   }
-
-  const token = partes[1];
 
   try {
-    // 2. Valida o token com a nossa chave secreta do .env
-    const verificado = jwt.verify(token, env.jwtSecret) as { id: string; email: string };
+    // 2. Verify the token using the secret key from env configuration, enforcing the algorithm
+    const verified = jwt.verify(token, env.jwtSecret, { algorithms: ['HS256'] }) as { id: string; email: string };
 
-    // 3. Se deu certo, salva os dados do usuário dentro da 'req' para as próximas funções saberem quem ele é
-    req.usuarioLogado = { id: verificado.id, email: verificado.email };
+    // 3. Save the user details in the 'req' object for downstream handlers
+    req.currentUser = { id: verified.id, email: verified.email };
 
     return next();
 
   } catch (error) {
-    return res.status(401).json({ error: 'Token inválido ou expirado.' });
+    return res.status(401).json({ error: 'Invalid or expired token.' });
   }
 };

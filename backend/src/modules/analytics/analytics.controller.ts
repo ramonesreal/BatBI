@@ -1,386 +1,414 @@
-import { Request, Response } from 'express';
+// analytics.controller.ts
+import { Response } from 'express';
 import axios from 'axios';
 import FormData from 'form-data';
-import { PrismaClient } from '@prisma/client';
-import { RequestAutenticado } from '../auth/auth.middleware';
+import prisma from '../../database';
+import { AuthenticatedRequest } from '../auth/auth.middleware';
 import { databaseService } from '../../services/databaseService';
 import { pdfService } from '../../services/pdfService';
 
-const prisma = new PrismaClient();
-
 export const analyticsController = {
-  // Inspeciona o arquivo e retorna o array de colunas disponíveis
-  async inspecionarCsv(req: RequestAutenticado, res: Response): Promise<any> {
+  /**
+   * Inspects the uploaded CSV file and returns the array of available columns.
+   * This is typically used to populate <select> elements in the frontend.
+   * @param req The authenticated request object with an uploaded file.
+   * @param res The response object.
+   * @returns A JSON response containing the available columns or an error.
+   */
+  async inspectCsv(req: AuthenticatedRequest, res: Response): Promise<any> {
     try {
       if (!req.file) {
-        return res.status(400).json({ error: 'Nenhum arquivo enviado.' });
+        return res.status(400).json({ error: 'No file uploaded.' });
       }
 
       const formData = new FormData();
       formData.append('file', req.file.buffer, { filename: req.file.originalname });
 
-      // Envia os bytes do arquivo para a rota de inspeção rápida do Python
-      const respostaPython = await axios.post('http://127.0.0.1:5000/inspecionar-csv', formData, {
+      // Sends the file bytes to Python's quick inspection route
+      const pythonResponse = await axios.post('http://127.0.0.1:5000/inspect-csv', formData, {
         headers: {
           ...formData.getHeaders(),
         },
       });
 
-      // Retorna diretamente o objeto { colunas: [...] } para o front-end
-      return res.json(respostaPython.data);
+      // Returns the response from python engine
+      return res.json(pythonResponse.data);
 
     } catch (error: any) {
-      console.error('Erro na inspeção do cabeçalho do arquivo:', error.message);
+      console.error('Error communicating with data-engine during CSV inspection:', error.message);
       return res.status(500).json({
-        error: 'Erro interno ao tentar mapear a estrutura do arquivo CSV.'
+        error: 'Internal server error when trying to inspect analytical data.',
       });
     }
   },
 
-  async processarCsv(req: RequestAutenticado, res: Response): Promise<any> {
+  /**
+   * Processes the uploaded CSV file based on X and Y axis selections and chart type.
+   * Generates chart data, calculates KPIs, and saves the dashboard configuration.
+   * @param req The authenticated request object with file and chart configuration.
+   * @param res The response object.
+   * @returns A JSON response containing the chart data, KPIs, and dashboard ID or an error.
+   */
+  async processCsv(req: AuthenticatedRequest, res: Response): Promise<any> {
+    const userId = req.currentUser?.id;
+    if (!userId) {
+      return res.status(401).json({ error: 'User not authenticated.' });
+    }
+
     try {
       if (!req.file) {
-        return res.status(400).json({ error: 'Nenhum arquivo enviado.' });
+        return res.status(400).json({ error: 'No file uploaded.' });
       }
 
-      // 👤 Pegamos o ID do usuário exatamente de onde o seu middleware injeta
-      const userId = req.usuarioLogado?.id;
+      // Support both English and Portuguese parameter structures from request body/form
+      const xAxis = req.body.xAxis || req.body.eixo_x;
+      const yAxis = req.body.yAxis || req.body.eixo_y;
+      const chartType = req.body.chartType || req.body.tipo_grafico || 'bar';
 
-      if (!userId) {
-        return res.status(401).json({ error: 'Usuário não identificado na sessão.' });
+      if (!xAxis || !yAxis) {
+        return res.status(400).json({ error: 'Axis parameters (xAxis/yAxis) are required.' });
       }
-
-      const eixoX = req.body.eixo_x || 'categoria';
-      const eixoY = req.body.eixo_y || 'valor';
-      const tipoGrafico = req.body.tipo_grafico || 'bar'; // 🎛️ Captura o tipo escolhido pelo usuário
 
       const formData = new FormData();
       formData.append('file', req.file.buffer, { filename: req.file.originalname });
-      formData.append('eixo_x', eixoX);
-      formData.append('eixo_y', eixoY);
-      formData.append('tipo_grafico', tipoGrafico); // 🚀 Repassa o tipo para a engine Python
+      formData.append('xAxis', xAxis);
+      formData.append('yAxis', yAxis);
+      formData.append('chartType', chartType);
 
-      const respostaPython = await axios.post('http://127.0.0.1:5000/processar-csv', formData, {
+      // Sends the file bytes and chart configuration to the Python data-engine for processing
+      const pythonResponse = await axios.post('http://127.0.0.1:5000/process-csv', formData, {
         headers: {
           ...formData.getHeaders(),
         },
       });
 
-      const dadosDoGrafico = respostaPython.data;
+      const chartData = pythonResponse.data;
 
-      // 🧮 Extrai os valores numéricos retornados pela Engine Python
-      // Nota: Ajuste o caminho se a sua engine estruturar o array de dados de outra forma
-      const valores = dadosDoGrafico.datasets?.[0]?.data || [];
+      // Extract values to calculate KPIs
+      const values = chartData.datasets?.[0]?.data || [];
 
-      // Calcular os KPIs sobre os dados processados do CSV
-      const totalY = valores.reduce((acc: number, val: number) => acc + val, 0);
-      const maiorY = valores.length > 0 ? Math.max(...valores) : 0;
-      const mediaY = valores.length > 0 ? totalY / valores.length : 0;
+      // Calculate KPIs over the processed CSV data
+      const totalY = values.reduce((acc: number, val: number) => acc + val, 0);
+      const maxY = values.length > 0 ? Math.max(...values) : 0;
+      const averageY = values.length > 0 ? totalY / values.length : 0;
 
-      // 🚀 Acopla o objeto kpis mantendo a paridade idêntica com o payload do SQL
-      dadosDoGrafico.kpis = {
+      // 🚀 Attach the KPIs object
+      chartData.kpis = {
         total: totalY,
-        maior: maiorY,
-        media: mediaY,
-        sufixo: eixoY.toLowerCase().includes('faturamento') || eixoY.toLowerCase().includes('valor') ? 'R$' : ''
+        max: maxY,
+        average: averageY,
+        suffix: yAxis.toLowerCase().includes('revenue') || yAxis.toLowerCase().includes('value') || yAxis.toLowerCase().includes('faturamento') || yAxis.toLowerCase().includes('valor') ? '$' : ''
       };
 
-      // 🗄️ Gravação automática no banco de dados via Prisma usando o schema Dashboard
-      const novoDashboardSalvo = await prisma.dashboard.create({
+      // 🗄️ Save the dashboard to database
+      const newDashboardSaved = await prisma.dashboard.create({
         data: {
-          titulo: req.file.originalname, // Nome do arquivo .csv vira o título inicial
-          configJson: JSON.stringify(dadosDoGrafico), // Transforma o JSON (agora com KPIs) em texto
-          userId: userId, // Chave estrangeira atrelada ao usuário logado
+          titulo: req.file.originalname,
+          configJson: JSON.stringify(chartData),
+          userId: userId,
         },
       });
 
-      // Retorna os dados analíticos mais o ID gerado no banco de dados
       return res.json({
-        ...dadosDoGrafico,
-        dashboardId: novoDashboardSalvo.id
+        ...chartData,
+        dashboardId: newDashboardSaved.id
       });
 
     } catch (error: any) {
-      console.error('Erro na comunicação com o data-engine ou banco:', error.message);
+      console.error('Error communicating with data-engine during CSV processing:', error.message);
       return res.status(500).json({
-        error: 'Erro interno no servidor ao tentar processar os dados analíticos.'
+        error: 'Internal server error when trying to process analytical data.',
       });
     }
   },
 
-  async listarHistorico(req: RequestAutenticado, res: Response): Promise<any> {
+  /**
+   * Lists the user's dashboard history.
+   * @param req The authenticated request object.
+   * @param res The response object.
+   * @returns A JSON response containing the list of dashboards or an error.
+   */
+  async listHistory(req: AuthenticatedRequest, res: Response): Promise<any> {
+    const userId = req.currentUser?.id;
+    if (!userId) {
+      return res.status(401).json({ error: 'User not authenticated.' });
+    }
+
     try {
-      const userId = req.usuarioLogado?.id;
-
-      if (!userId) {
-        return res.status(401).json({ error: 'Usuário não identificado na sessão.' });
-      }
-
-      // Busca no banco todos os dashboards criados por este usuário, ordenando pelos mais recentes
-      const historico = await prisma.dashboard.findMany({
-        where: {
-          userId: userId,
-        },
-        orderBy: {
-          createdAt: 'desc',
-        },
-        select: {
-          id: true,
-          titulo: true,
-          configJson: true,
-          createdAt: true,
-        }
+      const userDashboards = await prisma.dashboard.findMany({
+        where: { userId },
+        orderBy: { createdAt: 'desc' },
       });
 
-      // Como o configJson está salvo como string no banco, vamos transformá-lo 
-      // de volta em objeto JSON real para o Front-end não ter trabalho
-      const historicoFormatado = historico.map(item => ({
+      // Parse the configuration JSON back to object for the frontend
+      const formattedHistory = userDashboards.map(item => ({
         id: item.id,
         titulo: item.titulo,
         createdAt: item.createdAt,
         chartData: JSON.parse(item.configJson)
       }));
 
-      return res.json(historicoFormatado);
-
+      return res.json(formattedHistory);
     } catch (error: any) {
-      console.error('Erro ao buscar histórico:', error.message);
-      return res.status(500).json({
-        error: 'Erro interno ao carregar o histórico de análises.'
-      });
+      console.error('Error listing dashboard history:', error.message);
+      return res.status(500).json({ error: 'Internal server error listing history.' });
     }
   },
 
-  // 🗑️ Deleta uma ou múltiplas análises do histórico
-  async deletarHistorico(req: RequestAutenticado, res: Response): Promise<any> {
+  /**
+   * Deletes dashboard history, either a specific item by ID or all history for the user.
+   * @param req The authenticated request object with ID in params or query indicator.
+   * @param res The response object.
+   * @returns A success message or an error.
+   */
+  async deleteHistory(req: AuthenticatedRequest, res: Response): Promise<any> {
+    const userId = req.currentUser?.id;
+    if (!userId) {
+      return res.status(401).json({ error: 'User not authenticated.' });
+    }
+
+    const { id } = req.params;
+    const { all } = req.query;
+
+    const { ids } = req.body || {};
+
     try {
-      const userId = req.usuarioLogado?.id;
-      if (!userId) {
-        return res.status(401).json({ error: 'Usuário não identificado na sessão.' });
-      }
+      if (id && id !== 'undefined' && id !== '') {
+        const dashboard = await prisma.dashboard.findFirst({
+          where: { id: String(id), userId }
+        });
 
-      // 📥 Captura os dados garantindo que o TS saiba os formatos possíveis
-      const idsDoBody = req.body.ids;
-      const idDaUrl = req.params.id;
-
-      let idsParaDeletar: string[] = [];
-
-      // Se veio id na URL, garante que é uma string pura antes de jogar no array
-      if (idDaUrl) {
-        idsParaDeletar.push(typeof idDaUrl === 'string' ? idDaUrl : String(idDaUrl));
-      }
-
-      // Se vieram ids no body, garante que é um array de strings
-      if (idsDoBody && Array.isArray(idsDoBody)) {
-        idsParaDeletar = [...idsParaDeletar, ...idsDoBody.map(id => String(id))];
-      }
-
-      if (idsParaDeletar.length === 0) {
-        return res.status(400).json({ error: 'Nenhum ID foi fornecido para exclusão.' });
-      }
-
-      // Executa a deleção em lote garantindo a segurança pelo userId
-      const deletados = await prisma.dashboard.deleteMany({
-        where: {
-          id: { in: idsParaDeletar }, // 🔒 O Prisma aceita estritamente string[] aqui dentro de 'in'
-          userId: userId
+        if (!dashboard) {
+          return res.status(404).json({ error: 'Dashboard not found or unauthorized.' });
         }
-      });
 
-      return res.json({
-        success: true,
-        message: `${deletados.count} análise(s) removida(s) com sucesso.`
-      });
+        await prisma.dashboard.delete({
+          where: { id: String(id) }
+        });
+
+        return res.status(200).json({ message: 'History item deleted successfully.' });
+      }
+
+      if (all === 'true') {
+        await prisma.dashboard.deleteMany({
+          where: { userId },
+        });
+        return res.status(200).json({ message: 'All history deleted successfully.' });
+      }
+
+      if (ids && Array.isArray(ids) && ids.length > 0) {
+        await prisma.dashboard.deleteMany({
+          where: {
+            userId,
+            id: { in: ids.map(String) }
+          }
+        });
+        return res.status(200).json({ message: 'Selected history items deleted successfully.' });
+      }
+
+      return res.status(400).json({ error: 'Invalid request. Missing targeted ID or ID list.' });
 
     } catch (error: any) {
-      console.error('Erro ao deletar histórico:', error.message);
-      return res.status(500).json({
-        error: 'Erro interno ao tentar remover itens do banco.'
-      });
+      console.error('Error deleting dashboard history:', error.message);
+      return res.status(500).json({ error: 'Internal server error deleting history.' });
     }
   },
 
-  // 🔗 POST /analytics/db-test
-  async testarConexaoBanco(req: RequestAutenticado, res: Response): Promise<any> {
+  /**
+   * Tests a database connection and returns tables to make database configuration easier for users.
+   * @param req The authenticated request object with database configuration in the body.
+   * @param res The response object.
+   * @returns A JSON response indicating connection success and available tables.
+   */
+  async testDatabaseConnection(req: AuthenticatedRequest, res: Response): Promise<any> {
     try {
       const { host, port, user, pass, name } = req.body;
 
       if (!host || !port || !user || !pass || !name) {
-        return res.status(400).json({ error: 'Todos os campos de credenciais são obrigatórios.' });
+        return res.status(400).json({ error: 'Missing database connection parameters.' });
       }
 
-      const conectado = await databaseService.testarConexao({
-        host,
-        port: Number(port),
-        user,
-        pass,
-        name
-      });
+      const dbConfig = { host, port: Number(port), user, pass, name };
+      const isConnected = await databaseService.testConnection(dbConfig);
 
-      if (!conectado) {
-        return res.status(400).json({ success: false, error: 'Não foi possível estabelecer conexão. Verifique os dados e o firewall.' });
+      if (!isConnected) {
+        return res.status(400).json({ error: 'Could not establish connection to the database.' });
       }
 
-      // 🚀 Já busca e retorna as tabelas para alimentar o front-end imediatamente
-      const tabelas = await databaseService.listarTabelas({
-        host,
-        port: Number(port),
-        user,
-        pass,
-        name
-      });
+      // If connection succeeds, retrieve table list for user convenience
+      const tables = await databaseService.listTables(dbConfig);
 
       return res.json({
-        success: true,
-        message: 'Conexão estabelecida com sucesso!',
-        tabelas
+        message: 'Connection established successfully!',
+        tabelas: tables // Matches frontend expectations
       });
     } catch (error: any) {
-      return res.status(500).json({ error: 'Erro interno ao validar banco de dados.' });
+      console.error('Error testing database connection:', error.message);
+      return res.status(500).json({ error: 'Internal server error testing database connection.' });
     }
   },
 
-  // 🗂️ POST /analytics/db-tables
-  async obterTabelasBanco(req: RequestAutenticado, res: Response): Promise<any> {
+  /**
+   * Retrieves tables from a database using provided configuration.
+   * @param req The authenticated request object with database configuration in the body.
+   * @param res The response object.
+   * @returns A JSON response containing database tables or an error.
+   */
+  async getDatabaseTables(req: AuthenticatedRequest, res: Response): Promise<any> {
     try {
       const { host, port, user, pass, name } = req.body;
+      const dbConfig = { host, port: Number(port), user, pass, name };
 
-      const tabelas = await databaseService.listarTabelas({
-        host,
-        port: Number(port),
-        user,
-        pass,
-        name
-      });
-
-      return res.json({ success: true, tabelas });
+      const tables = await databaseService.listTables(dbConfig);
+      return res.json({ success: true, tables });
     } catch (error: any) {
-      return res.status(400).json({ error: error.message });
+      console.error('Error getting database tables:', error.message);
+      return res.status(500).json({ error: 'Internal server error getting database tables.' });
     }
   },
 
-  // 📊 POST /analytics/db-columns
-  async obterColunasBanco(req: RequestAutenticado, res: Response): Promise<any> {
+  /**
+   * Retrieves columns for a specific table from a database using provided configuration.
+   * @param req The authenticated request object with database configuration and table name in the body.
+   * @param res The response object.
+   * @returns A JSON response containing table columns or an error.
+   */
+  async getDatabaseColumns(req: AuthenticatedRequest, res: Response): Promise<any> {
     try {
-      const { host, port, user, pass, name, tabela } = req.body;
+      const { host, port, user, pass, name, tabela, tableName } = req.body;
+      const targetTable = tableName || tabela;
 
-      if (!tabela) {
-        return res.status(400).json({ error: 'É necessário informar a tabela para mapeamento.' });
+      if (!targetTable) {
+        return res.status(400).json({ error: 'Table name is required.' });
       }
 
-      const colunas = await databaseService.obterColunasTabela({
-        host,
-        port: Number(port),
-        user,
-        pass,
-        name
-      }, tabela);
+      const dbConfig = { host, port: Number(port), user, pass, name };
+      const columns = await databaseService.getColumnsFromTable(dbConfig, targetTable);
 
-      return res.json({ success: true, colunas });
+      return res.json({ success: true, colunas: columns }); // Mapped to 'colunas' for frontend
     } catch (error: any) {
-      return res.status(400).json({ error: error.message });
+      console.error('Error getting database columns:', error.message);
+      return res.status(500).json({ error: error.message });
     }
   },
 
-  // ⚡ POST /analytics/query
-  async processarQueryBanco(req: RequestAutenticado, res: Response): Promise<any> {
+  /**
+   * Processes a database query using provided configuration and chart parameters.
+   * @param req The authenticated request object with database configuration, query, and chart parameters.
+   * @param res The response object.
+   * @returns A JSON response containing processed query results and KPIs or an error.
+   */
+  async processDatabaseQuery(req: AuthenticatedRequest, res: Response): Promise<any> {
+    const userId = req.currentUser?.id;
+    if (!userId) {
+      return res.status(401).json({ error: 'User not authenticated.' });
+    }
+
     try {
-      const userId = req.usuarioLogado?.id;
+      const { host, port, user, pass, name, tabela, tableName, eixo_x, eixo_y, xAxis, yAxis, tipo_grafico, chartType } = req.body;
 
-      if (!userId) {
-        return res.status(401).json({ error: 'Usuário não identificado na sessão.' });
+      const targetTable = tableName || tabela;
+      const targetX = xAxis || eixo_x;
+      const targetY = yAxis || eixo_y;
+      const targetChartType = chartType || tipo_grafico || 'bar';
+
+      if (!targetTable || !targetX || !targetY) {
+        return res.status(400).json({ error: 'Missing mapping parameters (table, xAxis, yAxis).' });
       }
 
-      const { host, port, user, pass, name, tabela, eixo_x, eixo_y, tipo_grafico } = req.body;
+      const dbConfig = { host, port: Number(port), user, pass, name };
+      const aggregatedData = await databaseService.runAnalyticalQuery(dbConfig, targetTable, targetX, targetY);
 
-      if (!tabela || !eixo_x || !eixo_y || !tipo_grafico) {
-        return res.status(400).json({ error: 'Parâmetros de mapeamento ausentes.' });
-      }
+      const labels = aggregatedData.map(d => d.label);
+      const values = aggregatedData.map(d => d.value);
 
-      // 1. Busca os dados agregados do banco externo do cliente
-      const dadosAgregados = await databaseService.rodarQueryAnalitica({
-        host,
-        port: Number(port),
-        user,
-        pass,
-        name
-      }, tabela, eixo_x, eixo_y);
-
-      const labels = dadosAgregados.map(d => d.label);
-      const valores = dadosAgregados.map(d => d.valor);
-
-      // 🧮 Cálculo Dinâmico dos KPIs para o Banco de Dados
-      const totalY = valores.reduce((acc, val) => acc + val, 0);
-      const maiorY = valores.length > 0 ? Math.max(...valores) : 0;
-      const mediaY = valores.length > 0 ? totalY / valores.length : 0;
+      // Calculate KPIs
+      const totalY = values.reduce((acc, val) => acc + val, 0);
+      const maxY = values.length > 0 ? Math.max(...values) : 0;
+      const averageY = values.length > 0 ? totalY / values.length : 0;
 
       const chartData = {
         labels,
         datasets: [
           {
-            label: `${eixo_y} por ${eixo_x}`,
-            data: valores,
-            backgroundColor: tipo_grafico === 'line' ? 'rgba(234, 179, 8, 0.2)' : 'rgba(234, 179, 8, 0.8)',
+            label: `${targetY} by ${targetX}`,
+            data: values,
+            backgroundColor: targetChartType === 'line' ? 'rgba(234, 179, 8, 0.2)' : 'rgba(234, 179, 8, 0.8)',
             borderColor: '#eab308',
             borderWidth: 2,
           }
         ],
-        tipo: tipo_grafico,
-        // 🚀 Injeta os indicadores estruturados no payload
+        type: targetChartType,
         kpis: {
           total: totalY,
-          maior: maiorY,
-          media: mediaY,
-          sufixo: eixo_y.toLowerCase().includes('faturamento') || eixo_y.toLowerCase().includes('valor') ? 'R$' : ''
+          max: maxY,
+          average: averageY,
+          suffix: targetY.toLowerCase().includes('revenue') || targetY.toLowerCase().includes('value') || targetY.toLowerCase().includes('faturamento') || targetY.toLowerCase().includes('valor') ? '$' : ''
         }
       };
 
-      const novaAnalise = await prisma.dashboard.create({
+      // Save analytics snapshot to history
+      const newAnalysis = await prisma.dashboard.create({
         data: {
           userId: userId,
-          titulo: `SQL: ${tabela} [${eixo_y} x ${eixo_x}]`,
+          titulo: `SQL: ${targetTable} [${targetY} x ${targetX}]`,
           configJson: JSON.stringify(chartData)
         }
       });
 
       return res.json({
-        dashboardId: novaAnalise.id,
+        dashboardId: newAnalysis.id,
         ...chartData
       });
+
     } catch (error: any) {
-      return res.status(400).json({ error: error.message });
+      console.error('Error processing database query:', error.message);
+      return res.status(500).json({ error: error.message });
     }
   },
 
-  async exportarPdf(req: Request, res: Response): Promise<any> {
+  /**
+   * Exports a dashboard report as a PDF.
+   * @param req The authenticated request object with chart data for PDF generation.
+   * @param res The response object.
+   * @returns A PDF file buffer as a response or an error.
+   */
+  async exportPdf(req: AuthenticatedRequest, res: Response): Promise<any> {
     try {
-      // 🚀 Captura o 'graficoImg' vindo do payload do Front-end
-      const { titulo, kpis, labels, datasets, graficoImg } = req.body;
+      // support both English and Portuguese parameter structures from request body
+      const { title, titulo, kpis, labels, datasets, chartImg, graficoImg } = req.body;
+      const targetTitle = title || titulo || 'BatBI_Analysis';
+      const targetChartImg = chartImg || graficoImg;
 
-      if (!kpis || !labels || !datasets?.[0]?.data || !graficoImg) {
-        return res.status(400).json({ error: 'Dados insuficientes (incluindo o gráfico capturado) para gerar o relatório.' });
+      if (!kpis || !labels || !datasets?.[0]?.data || !targetChartImg) {
+        return res.status(400).json({ error: 'Insufficient data to generate the report.' });
       }
 
-      const valores = datasets[0].data;
+      const values = datasets[0].data;
 
-      // 📡 Dispara o serviço do Puppeteer repassando o Base64 do gráfico Recharts
-      const pdfBuffer = await pdfService.gerarRelatorioDashboard({
-        titulo: titulo || 'Analise_BatBI',
-        kpis,
+      // 📡 Triggers the Puppeteer service by passing the Recharts chart Base64 image
+      const pdfBuffer = await pdfService.generateDashboardReport({
+        title: targetTitle,
+        kpis: {
+          total: kpis.total || kpis.total || 0,
+          max: kpis.max || kpis.maior || 0,
+          average: kpis.average || kpis.media || 0,
+          suffix: kpis.suffix || kpis.sufixo
+        },
         labels,
-        valores,
-        graficoImg // 🔥 Passado com sucesso para o template HTML do Puppeteer
+        values,
+        chartImg: targetChartImg
       });
 
-      // Configura os headers HTTP para forçar o navegador a entender que é um download de arquivo
+      // Sets HTTP headers to force the browser to understand it's a file download
       res.setHeader('Content-Type', 'application/pdf');
-      res.setHeader('Content-Disposition', `attachment; filename=Relatorio_BatBI.pdf`);
+      res.setHeader('Content-Disposition', `attachment; filename=BatBI_Report.pdf`);
 
       return res.end(pdfBuffer);
 
     } catch (error: any) {
-      console.error('Erro ao gerar exportação em PDF:', error.message);
-      return res.status(500).json({ error: 'Falha interna ao processar arquivo PDF.' });
+      console.error('Error generating PDF export:', error.message);
+      return res.status(500).json({ error: 'Internal failure processing PDF file.' });
     }
   }
 };

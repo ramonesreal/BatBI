@@ -4,33 +4,33 @@ import { useNavigate } from 'react-router-dom';
 import { api } from '../../services/api';
 
 export default function Cadastro() {
-  const [nome, setNome] = useState('');
+  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
-  const [senha, setSenha] = useState('');
+  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [erro, setErro] = useState('');
+  const [error, setError] = useState('');
 
   const navigate = useNavigate();
 
   const handleCadastro = async (e: SyntheticEvent) => {
     e.preventDefault();
     setLoading(true);
-    setErro('');
+    setError('');
 
     try {
-      // Dispara para a rota de cadastro que você estrutururou no backend
-      await api.post('/auth/cadastro', {
-        nome,
+      // Calls the signup route structured in the backend
+      await api.post('/auth/signup', {
+        name,
         email,
-        senha,
+        password,
       });
 
-      // Cadastro feito com sucesso! Redireciona o agente direto para o login
+      // Redirects directly to login upon successful registration
       navigate('/');
     } catch (err: any) {
-      console.error('Erro ao cadastrar agente:', err);
-      const mensagemErro = err.response?.data?.error || 'Erro ao conectar ao servidor.';
-      setErro(mensagemErro);
+      console.error('Error registering agent:', err);
+      const errorMessage = err.response?.data?.error || 'Error connecting to the server.';
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -46,83 +46,83 @@ export default function Cadastro() {
             BatBI <span className="text-xl">🦇</span>
           </h1>
           <p className="mt-2 text-sm text-gray-400">
-            Cadastre um novo agente no sistema de Gotham.
+            Register a new agent in the Gotham system.
           </p>
         </div>
 
-        {/* Formulário */}
+        {/* Form */}
         <form onSubmit={handleCadastro} className="space-y-6">
 
-          {/* Campo Nome */}
+          {/* Name Field */}
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-2">
-              Nome do Agente
+              Agent Name
             </label>
             <input
               type="text"
               required
-              value={nome}
-              onChange={(e) => setNome(e.target.value)}
-              placeholder="Ex: Bruce Wayne"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="e.g. Bruce Wayne"
               className="w-full rounded-lg border border-gray-700 bg-gray-950 px-4 py-3 text-white placeholder-gray-500 focus:border-yellow-500 focus:outline-none focus:ring-1 focus:ring-yellow-500"
             />
           </div>
 
-          {/* Campo E-mail */}
+          {/* Email Field */}
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-2">
-              E-mail de Gotham
+              Gotham Email
             </label>
             <input
               type="email"
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="nome@gotham.com"
+              placeholder="name@gotham.com"
               className="w-full rounded-lg border border-gray-700 bg-gray-950 px-4 py-3 text-white placeholder-gray-500 focus:border-yellow-500 focus:outline-none focus:ring-1 focus:ring-yellow-500"
             />
           </div>
 
-          {/* Campo Senha */}
+          {/* Password Field */}
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-2">
-              Senha de Acesso
+              Access Password
             </label>
             <input
               type="password"
               required
-              value={senha}
-              onChange={(e) => setSenha(e.target.value)}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"
               className="w-full rounded-lg border border-gray-700 bg-gray-950 px-4 py-3 text-white placeholder-gray-500 focus:border-yellow-500 focus:outline-none focus:ring-1 focus:ring-yellow-500"
             />
           </div>
 
-          {/* Mensagem de Erro (Se houver) */}
-          {erro && (
+          {/* Error Message */}
+          {error && (
             <div className="rounded-lg bg-red-950/50 border border-red-800 p-3 text-sm text-red-400 text-center">
-              ⚠️ {erro}
+              ⚠️ {error}
             </div>
           )}
 
-          {/* Botão Submit */}
+          {/* Submit Button */}
           <button
             type="submit"
             disabled={loading}
             className="w-full rounded-lg bg-yellow-600 py-3 font-semibold text-gray-950 transition-colors hover:bg-yellow-500 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:ring-offset-2 focus:ring-offset-gray-900 disabled:opacity-50"
           >
-            {loading ? 'Cadastrando...' : 'Registrar Agente'}
+            {loading ? 'Registering...' : 'Register Agent'}
           </button>
         </form>
 
-        {/* Link para voltar ao Login */}
+        {/* Login Link */}
         <div className="mt-6 text-center text-sm">
-          <span className="text-gray-400">Já tem uma credencial? </span>
+          <span className="text-gray-400">Already have credentials? </span>
           <button
             onClick={() => navigate('/')}
             className="font-medium text-yellow-500 hover:underline bg-transparent border-none cursor-pointer"
           >
-            Voltar para o Login
+            Back to Login
           </button>
         </div>
 

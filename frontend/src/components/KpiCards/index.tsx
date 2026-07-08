@@ -1,62 +1,63 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 
-interface KpiData {
-  total: number;
-  maior: number;
-  media: number;
-  sufixo?: string;
+interface KpiData { 
+  total?: number; 
+  maior?: number;
+  max?: number;
+  media?: number; 
+  average?: number; 
+  sufixo?: string; 
 }
 
-interface KpiCardsProps {
-  kpis?: KpiData;
-}
+interface KpiCardsProps { kpis?: KpiData; }
 
 export const KpiCards: React.FC<KpiCardsProps> = ({ kpis }) => {
-  // Se ainda não houver dados de KPIs processados, exibe um estado vazio ou oculto
+  const { t } = useTranslation();
   if (!kpis) return null;
 
-  // Função auxiliar para formatar os números de maneira amigável corporativa
-  const formatarNumero = (valor: number) => {
-    return valor.toLocaleString('pt-BR', {
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 2,
-    });
+  // 🛡️ Função blindada contra valores undefined ou null
+  const formatNumber = (value: any) => {
+    if (value === undefined || value === null || isNaN(Number(value))) {
+      return '0';
+    }
+    return Number(value).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
   };
 
-  const prefixo = kpis.sufixo || '';
+  const prefix = kpis.sufixo || '';
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-      {/* Card 1: Faturamento/Soma Total */}
+      {/* 1. Total */}
       <div className="bg-slate-900 border border-slate-800 p-5 rounded-xl shadow-lg transition-all hover:border-yellow-500/40">
         <div className="flex items-center justify-between mb-2">
-          <p className="text-sm font-medium text-slate-400 uppercase tracking-wider">Acumulado Total</p>
-          <span className="text-yellow-500 bg-yellow-500/10 p-2 rounded-lg text-xs font-bold">∑ Soma</span>
+          <p className="text-sm font-medium text-slate-400 uppercase tracking-wider">{t('kpi.total')}</p>
+          <span className="text-yellow-500 bg-yellow-500/10 p-2 rounded-lg text-xs font-bold">{t('kpi.totalBadge')}</span>
         </div>
         <p className="text-2xl font-bold text-white tracking-tight">
-          {prefixo} {formatarNumero(kpis.total)}
+          {prefix} {formatNumber(kpis.total ?? (kpis as any).totalRows)}
         </p>
       </div>
 
-      {/* Card 2: Média por Categoria */}
+      {/* 2. Global Average */}
       <div className="bg-slate-900 border border-slate-800 p-5 rounded-xl shadow-lg transition-all hover:border-yellow-500/40">
         <div className="flex items-center justify-between mb-2">
-          <p className="text-sm font-medium text-slate-400 uppercase tracking-wider">Média Global</p>
-          <span className="text-blue-400 bg-blue-500/10 p-2 rounded-lg text-xs font-bold">÷ Média</span>
+          <p className="text-sm font-medium text-slate-400 uppercase tracking-wider">{t('kpi.average')}</p>
+          <span className="text-blue-400 bg-blue-500/10 p-2 rounded-lg text-xs font-bold">{t('kpi.averageBadge')}</span>
         </div>
         <p className="text-2xl font-bold text-white tracking-tight">
-          {prefixo} {formatarNumero(kpis.media)}
+          {prefix} {formatNumber(kpis.media ?? (kpis as any).average)}
         </p>
       </div>
 
-      {/* Card 3: Maior Pico Detectado */}
+      {/* 3. Peak Maximum */}
       <div className="bg-slate-900 border border-slate-800 p-5 rounded-xl shadow-lg transition-all hover:border-yellow-500/40">
         <div className="flex items-center justify-between mb-2">
-          <p className="text-sm font-medium text-slate-400 uppercase tracking-wider">Pico Máximo</p>
-          <span className="text-emerald-400 bg-emerald-500/10 p-2 rounded-lg text-xs font-bold">↑ Maior</span>
+          <p className="text-sm font-medium text-slate-400 uppercase tracking-wider">{t('kpi.peak')}</p>
+          <span className="text-emerald-400 bg-emerald-500/10 p-2 rounded-lg text-xs font-bold">{t('kpi.peakBadge')}</span>
         </div>
         <p className="text-2xl font-bold text-white tracking-tight">
-          {prefixo} {formatarNumero(kpis.maior)}
+          {prefix} {formatNumber(kpis.max ?? kpis.maior)}
         </p>
       </div>
     </div>

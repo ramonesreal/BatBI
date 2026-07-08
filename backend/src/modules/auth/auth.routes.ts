@@ -4,19 +4,22 @@ import { authController } from './auth.controller';
 
 const authRoutes = Router();
 
-// 🔒 Configuração do porteiro de segurança para o cadastro
-const criacaoContaLimiter = rateLimit({
-  windowMs: 60 * 60 * 1000, // Janela de 1 hora
-  max: 5, // Limite de 5 cadastros por IP por hora
-  message: { error: 'Muitas contas criadas a partir deste IP. Tente novamente mais tarde.' },
+// 🔒 Security rate limiter configuration for signups
+const accountCreationLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour window
+  max: 5, // Limit to 5 signups per IP per hour
+  message: { error: 'Too many accounts created from this IP. Please try again later.' },
   standardHeaders: true,
   legacyHeaders: false,
 });
 
-// Rota de Cadastro
-authRoutes.post('/cadastro', criacaoContaLimiter, authController.cadastro);
+// Signup Route
+authRoutes.post('/signup', accountCreationLimiter, authController.signup);
 
-// Rota de Login
+// Signin/Login Route
 authRoutes.post('/login', authController.login);
+
+// Logout Route
+authRoutes.post('/logout', authController.logout);
 
 export default authRoutes;

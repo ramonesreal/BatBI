@@ -4,12 +4,12 @@ import Login from '../pages/Login';
 import Cadastro from '../pages/Cadastro';
 import Dashboard from '../pages/Dashboard';
 
-// Função simples para checar se o agente está autenticado
+// Simple helper to check if the agent is authenticated (client-side indication)
 const isAuthenticated = () => {
-  return !!localStorage.getItem('@BatBI:token');
+  return !!localStorage.getItem('@BatBI:user');
 };
 
-// Componente para proteger o Dashboard de acessos não autorizados
+// Route guard component to protect the Dashboard from unauthorized access
 function PrivateRoute({ children }: { children: ReactElement }) {
   return isAuthenticated() ? children : <Navigate to="/" replace />;
 }
@@ -18,11 +18,11 @@ export default function AppRoutes() {
   return (
     <BrowserRouter>
       <Routes>
-        {/* Rotas Públicas */}
+        {/* Public Routes */}
         <Route path="/" element={<Login />} />
         <Route path="/cadastro" element={<Cadastro />} />
 
-        {/* Rota Privada (Protegida) */}
+        {/* Private Route (Protected) */}
         <Route 
           path="/dashboard" 
           element={
@@ -32,7 +32,7 @@ export default function AppRoutes() {
           } 
         />
 
-        {/* Rota de fuga: se digitar qualquer coisa errada, volta para o Login */}
+        {/* Fallback route: redirects any unrecognized paths to Login */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>

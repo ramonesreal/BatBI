@@ -1,106 +1,117 @@
+// pdfService.ts
 import puppeteer from 'puppeteer';
 
-interface DadosPdf {
-  titulo: string;
+/**
+ * Interface for data required to generate a PDF report.
+ */
+interface PdfData {
+  title: string;
   kpis: {
     total: number;
-    maior: number;
-    media: number;
-    sufixo?: string;
+    max: number;
+    average: number;
+    suffix?: string;
   };
   labels: string[];
-  valores: number[];
-  graficoImg: string; // 🚀 Nova propriedade recebida do front-end
+  values: number[];
+  chartImg: string; // 🚀 New property received from the front-end (Base64 image)
 }
 
 export const pdfService = {
-  async gerarRelatorioDashboard(dados: DadosPdf): Promise<Buffer> {
+  /**
+   * Generates a dashboard report as a PDF.
+   * @param data The data needed to populate the PDF report.
+   * @returns A Buffer containing the generated PDF.
+   */
+  async generateDashboardReport(data: PdfData): Promise<Buffer> {
     const browser = await puppeteer.launch({
       headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox']
+      args: ['--no-sandbox', '--disable-setuid-sandbox'] // [SECURITY] See notes below.
     });
 
     const page = await browser.newPage();
 
-    // Auxiliar para formatação de números dentro do HTML
-    const formatar = (val: number) => val.toLocaleString('pt-BR', { maximumFractionDigits: 2 });
-    const prefixo = dados.kpis.sufixo || '';
+    // Helper for number formatting within HTML
+    const formatNumber = (val: number) => val.toLocaleString('en-US', { maximumFractionDigits: 2 }); // Changed to en-US for internationalization
+    const prefix = data.kpis.suffix || '';
 
-    // Criamos a estrutura de linhas da tabela de dados para o relatório
-    const linhasTabela = dados.labels.map((label, index) => `
+    // [SECURITY] HTML Entity Encoding: Ensure user-supplied strings are encoded to prevent XSS.
+    // For `data.title` and `data.labels`, which come from user input, they should be
+    // HTML-encoded before being embedded into the HTML template.
+    const encodeHtml = (str: string) => str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+
+    const encodedTitle = encodeHtml(data.title);
+
+    // Creates the data table row structure for the report
+    const tableRows = data.labels.map((label, index) => `
       <tr class="border-b border-slate-800 text-sm text-slate-300">
-        <td class="py-3 px-4 text-left">${label}</td>
-        <td class="py-3 px-4 text-right font-semibold text-white">${prefixo} ${formatar(dados.valores[index])}</td>
+        <td class="py-3 px-4 text-left">${encodeHtml(label)}</td>
+        <td class="py-3 px-4 text-right">${prefix} ${formatNumber(data.values[index])}</td>
       </tr>
     `).join('');
 
-    // Conteúdo HTML injetado dinamicamente com o print do Recharts integrado
-    const conteudoHtml = `
+    const contentHtml = `
       <!DOCTYPE html>
-      <html lang="pt-BR">
+      <html lang="en">
       <head>
-        <meta charset="UTF-8">
-        <script src="https://cdn.tailwindcss.com"></script>
-        <title>Relatório BatBI</title>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>BatBI Report - ${encodedTitle}</title>
+          <script src="https://cdn.tailwindcss.com"></script>
+          <style>
+              body { font-family: 'Inter', sans-serif; background-color: #0f172a; color: #e2e8f0; }
+              .container { max-width: 800px; margin: 0 auto; padding: 20px; }
+          </style>
       </head>
-      <body class="bg-slate-950 text-slate-100 p-10 font-sans">
-        
-        <div class="flex items-center justify-between border-b border-slate-800 pb-6 mb-8">
-          <div>
-            <h1 class="text-3xl font-bold text-yellow-500 tracking-tight">BatBI <span class="text-white text-xl font-normal">v1.0</span></h1>
-            <p class="text-xs text-slate-400 mt-1">Motor Analítico de Gotham — Relatório Executivo</p>
-          </div>
-          <div class="text-right">
-            <p class="text-sm font-medium text-white">${dados.titulo}</p>
-            <p class="text-xs text-slate-500 mt-0.5">Gerado em ${new Date().toLocaleDateString('pt-BR')}</p>
-          </div>
-        </div>
+      <body>
+          <div class="container bg-slate-950 p-8 rounded-lg shadow-2xl">
+              <div class="mb-8 text-center">
+                  <h1 class="text-3xl font-bold text-white mb-2">BatBI Dashboard Report</h1>
+                  <p class="text-md text-slate-400">Analysis: ${encodedTitle}</p>
+                  <p class="text-xs text-slate-500">Generated on: ${new Date().toLocaleDateString('en-US')}</p>
+              </div>
 
-        <div class="grid grid-cols-3 gap-4 mb-8">
-          <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl">
-            <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Acumulado Total</p>
-            <p class="text-xl font-bold text-white">${prefixo} ${formatar(dados.kpis.total)}</p>
-          </div>
-          <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl">
-            <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Média Global</p>
-            <p class="text-xl font-bold text-white">${prefixo} ${formatar(dados.kpis.media)}</p>
-          </div>
-          <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl">
-            <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Pico Máximo</p>
-            <p class="text-xl font-bold text-white">${prefixo} ${formatar(dados.kpis.maior)}</p>
-          </div>
-        </div>
+              <div class="grid grid-cols-3 gap-4 mb-8">
+                  <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl">
+                      <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Total Accumulated</p>
+                      <p class="text-xl font-bold text-white">${prefix} ${formatNumber(data.kpis.total)}</p>
+                  </div>
+                  <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl">
+                      <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Global Average</p>
+                      <p class="text-xl font-bold text-white">${prefix} ${formatNumber(data.kpis.average)}</p>
+                  </div>
+                  <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl">
+                      <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Maximum Peak</p>
+                      <p class="text-xl font-bold text-white">${prefix} ${formatNumber(data.kpis.max)}</p>
+                  </div>
+              </div>
 
-        <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 mb-8 shadow-xl flex justify-center">
-          <img src="${dados.graficoImg}" class="w-full max-h-[350px] object-contain rounded-lg" alt="Gráfico Analítico BatBI" />
-        </div>
+              <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 mb-8 shadow-xl flex justify-center">
+                  <img src="${data.chartImg}" alt="Dashboard Chart" class="max-w-full h-auto"/>
+              </div>
 
-        <div class="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-xl">
-          <div class="bg-slate-850 px-5 py-4 border-b border-slate-800">
-            <h3 class="text-sm font-bold uppercase tracking-wider text-yellow-500">Detalhamento dos Registros</h3>
+              <div class="mb-8">
+                  <h2 class="text-2xl font-bold text-white mb-4">Detailed Data</h2>
+                  <div class="overflow-x-auto rounded-lg border border-slate-800 shadow-lg">
+                      <table class="min-w-full bg-slate-900">
+                          <thead>
+                              <tr class="bg-slate-800">
+                                  <th class="py-3 px-4 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Category</th>
+                                  <th class="py-3 px-4 text-right text-xs font-semibold text-slate-400 uppercase tracking-wider">Value</th>
+                              </tr>
+                          </thead>
+                          <tbody>
+                              ${tableRows}
+                          </tbody>
+                      </table>
+                  </div>
+              </div>
           </div>
-          <table class="w-full text-left border-collapse">
-            <thead>
-              <tr class="bg-slate-950/60 border-b border-slate-800 text-xs font-semibold uppercase tracking-wider text-slate-400">
-                <th class="py-3 px-4 text-left">Dimensão (Eixo X)</th>
-                <th class="py-3 px-4 text-right">Métrica Agregada (Eixo Y)</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${linhasTabela}
-            </tbody>
-          </table>
-        </div>
-
-        <div class="mt-12 text-center text-xs text-slate-600 border-top border-slate-900 pt-4">
-          Documento confidencial gerado de forma automatizada pelo ecossistema BatBI.
-        </div>
-
       </body>
       </html>
     `;
 
-    await page.setContent(conteudoHtml, { waitUntil: 'domcontentloaded' });
+    await page.setContent(contentHtml, { waitUntil: 'domcontentloaded' });
 
     const pdfUint8Array = await page.pdf({
       format: 'A4',
