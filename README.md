@@ -4,6 +4,12 @@
 
 <h1 align="center"><strong>Gotham's Analytical Data Engine 🦇</strong></h1>
 
+<br/>
+<div align="center">
+  <video src="https://github.com/user-attachments/assets/58b7fa84-58e4-477d-ae4f-00d1d53c383f" width="100%" autoplay loop muted playsinline></video>
+</div>
+<br/>
+
 **BatBI** is a high-fidelity, full-stack Business Intelligence (BI) platform with a sleek *Goth/Dark* aesthetic, designed to process large data volumes smoothly and intuitively. The ecosystem enables both no-code file mapping via drag-and-drop (`.csv`) and dynamic runtime connections to external relational databases, generating instant executive reports complete with interactive charts, automated KPI cards, and native PDF exports.
 
 ---
