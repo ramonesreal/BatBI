@@ -44,6 +44,14 @@
 
 The ecosystem operates under an integrated microservices-inspired architecture:
 
+```mermaid
+graph TD
+    A[Frontend: React] -->|Requests| B[Core API: Node.js]
+    B -->|Metadata| C[(Database: Neon/PostgreSQL)]
+    B -->|Data Streams| D[Data Engine: Python/Pandas]
+    D -->|JSON Payloads| B
+```
+
 1. **Frontend (React):** Captures user interactions, files, and credentials, running validation checks to eliminate invalid server requests.
 2. **Core API (Node.js):** Verifies user sessions, logs analytic histories inside the metadata store (Neon), and initializes runtime connections to third-party customer databases.
 3. **Python Engine:** Receives raw data streams (via file byte buffers or structured queries) and executes rapid data manipulations using Pandas, returning a clean, typed JSON payload.
