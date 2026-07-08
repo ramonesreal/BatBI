@@ -44,6 +44,14 @@
 
 The ecosystem operates under an integrated microservices-inspired architecture:
 
+```mermaid
+graph TD
+    A[Frontend: React] -->|Requests| B[Core API: Node.js]
+    B -->|Metadata| C[(Database: Neon/PostgreSQL)]
+    B -->|Data Streams| D[Data Engine: Python/Pandas]
+    D -->|JSON Payloads| B
+```
+
 1. **Frontend (React):** Captures user interactions, files, and credentials, running validation checks to eliminate invalid server requests.
 2. **Core API (Node.js):** Verifies user sessions, logs analytic histories inside the metadata store (Neon), and initializes runtime connections to third-party customer databases.
 3. **Python Engine:** Receives raw data streams (via file byte buffers or structured queries) and executes rapid data manipulations using Pandas, returning a clean, typed JSON payload.
@@ -64,7 +72,7 @@ cd batbi
 ```
 ### 2. Configure the Core API (Node.js Backend)
 
-Navigate to the backend directory, install the required packages, and configure your environment variables:
+Navigate to the backend directory and install the required packages:
 ```bash
 cd backend
 npm install
@@ -96,10 +104,18 @@ python app.py
 ```
 ### 4. Run the Interface (React Frontend)
 
-Navigate to the frontend folder, install dependencies, and start Vite:
+Navigate to the frontend folder and install dependencies:
 ```bash
 cd ../frontend
 npm install
+```
+Create a `.env` file in the root of the frontend folder using the following template:
+```snippet
+# Backend URL (usually http://localhost:3000/api/v1)
+VITE_API_URL=your_backend_url
+```
+Start Vite:
+```bash
 npm run dev
 ```
 
