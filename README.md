@@ -181,14 +181,12 @@ This project is licensed under the MIT License. See the [LICENSE](LICENSE) file 
 
 ---
 
-## ☕ Support the Project
+## 💖 Support the Project
 
-BatBI is an open-core initiative. If you find value in our data analytics engine, consider supporting its evolution into a secure, multi-tenant SaaS.
+If **BatBI** helped you optimize your data workflow or inspired your next full-stack architecture, consider supporting its continuous development! 
 
-<iframe src="https://github.com/sponsors/ramonesreal/card" title="Sponsor ramonesreal" height="225" width="600" style="border: 0;"></iframe>
-
-**Prefer another way?** 
-* [Support via Buy Me a Coffee ☕](https://www.buymeacoffee.com/ramonesreal)
+* [Become a Sponsor on GitHub Sponsors](https://github.com/sponsors/ramonesreal)
+* [Buy Me a Coffee ☕](https://www.buymeacoffee.com/ramonesreal)
 
 ---
 
