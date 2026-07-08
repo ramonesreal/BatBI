@@ -6,7 +6,7 @@
 
 <br/>
 <div align="center">
-  <img width="800" height="450" alt="demo-ezgif com-effects" src="https://github.com/user-attachments/assets/9a8f455f-2e7a-4cee-8f06-5d9441617382" />
+  <img width="800" height="450" alt="demo-ezgif com-video-to-gif-converter" src="https://github.com/user-attachments/assets/1085aed7-f3f8-42a6-acf0-b6e1fa00b6d2" />
 </div>
 <br/>
 
