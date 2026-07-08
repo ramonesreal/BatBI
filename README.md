@@ -64,7 +64,7 @@ cd batbi
 ```
 ### 2. Configure the Core API (Node.js Backend)
 
-Navigate to the backend directory, install the required packages, and configure your environment variables:
+Navigate to the backend directory and install the required packages:
 ```bash
 cd backend
 npm install
@@ -96,10 +96,18 @@ python app.py
 ```
 ### 4. Run the Interface (React Frontend)
 
-Navigate to the frontend folder, install dependencies, and start Vite:
+Navigate to the frontend folder and install dependencies:
 ```bash
 cd ../frontend
 npm install
+```
+Create a `.env` file in the root of the frontend folder using the following template:
+```snippet
+# Backend URL (usually http://localhost:3000/api/v1)
+VITE_API_URL=your_backend_url
+```
+Start Vite:
+```bash
 npm run dev
 ```
 
