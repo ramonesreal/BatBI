@@ -181,8 +181,17 @@ This project is licensed under the MIT License. See the [LICENSE](LICENSE) file 
 
 ---
 
+## 💖 Support the Project
+
+If **BatBI** helped you optimize your data workflow or inspired your next full-stack architecture, consider supporting its continuous development! 
+
+* [Become a Sponsor on GitHub Sponsors](https://github.com/sponsors/ramonesreal)
+* [Buy Me a Coffee ☕](https://www.buymeacoffee.com/ramonesreal)
+
+---
+
 ## 👨‍💻 Developed by:
 
 * 🦇 **Ramon Lima**
 
-* 🔗 **My LinkedIn:** [Ramon Lima](https://www.linkedin.com/in/ramon-lima-251835415/)
+* 🔗 **My LinkedIn:** [Ramon Lima](https://www.linkedin.com/in/ramonesreal/)
