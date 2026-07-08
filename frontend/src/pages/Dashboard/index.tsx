@@ -103,7 +103,7 @@ export default function Dashboard() {
     try {
       await api.delete('/analytics/history', { data: { ids } });
       if (chartData && ids.includes(chartData.dashboardId)) setChartData(null);
-      setSuccess(t('history.deleteSuccess') || 'Analysis deleted successfully!'); loadHistory();
+      setSuccess(t('dashboard.deleteSuccess')); loadHistory();
     } catch { setError(t('dashboard.errorBatchDelete')); }
   };
 
