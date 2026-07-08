@@ -6,7 +6,7 @@
 
 <br/>
 <div align="center">
-  <video src="https://github.com/user-attachments/assets/58b7fa84-58e4-477d-ae4f-00d1d53c383f" width="100%" autoplay loop muted playsinline></video>
+  <img width="800" height="450" alt="demo-ezgif com-effects" src="https://github.com/user-attachments/assets/9a8f455f-2e7a-4cee-8f06-5d9441617382" />
 </div>
 <br/>
 
